@@ -1,0 +1,6 @@
+[hooks]
+pre-commit = ["cargo check", "cargo fmt -- --check"]
+pre-push = ["cargo hakari generate", "cargo test"]
+
+[logging]
+verbose = true

@@ -1,0 +1,12 @@
+[workspace]
+
+members = [
+    "ghirahim_bot",
+    "libghirahim"
+,
+    "workspace-hack"
+]
+resolver = "2"
+
+[workspace.dev-dependencies]
+rusty-hook = "0.11.2"

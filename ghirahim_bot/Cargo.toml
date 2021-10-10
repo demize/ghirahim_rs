@@ -1,0 +1,16 @@
+[package]
+name = "ghirahim_bot"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+twitch-irc = { version = "3.0.1", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
+tokio = { version = "1.12.0", features = ["rt", "rt-multi-thread", "macros"] }
+serde = "1.0"
+serde_yaml = "0.8.21"
+tldextract = "0.5.1"
+tempfile = "3.2.0"
+libghirahim = { path = "../libghirahim" }
+workspace-hack = { path = "../workspace-hack"}
