@@ -201,7 +201,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a909e4d93292cd8e9c42e189f61681eff9d67b6541f96b8a1a737f23737bd001"
 dependencies = [
  "bytes 1.1.0",
+ "futures-core",
  "memchr",
+ "pin-project-lite",
+ "tokio 1.12.0",
+ "tokio-util",
 ]
 
 [[package]]
@@ -894,6 +898,7 @@ dependencies = [
  "redis",
  "regex",
  "serde",
+ "serde_json",
  "strum",
  "tempfile",
  "tldextract",
@@ -1445,11 +1450,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "202c5bf92cad3d57605c366e644a7fbf305a83f19754fc66678c6265dcc9b8b4"
 dependencies = [
  "async-trait",
+ "bytes 1.1.0",
  "combine",
  "dtoa",
+ "futures-util",
  "itoa",
  "percent-encoding 2.1.0",
+ "pin-project-lite",
  "sha1",
+ "tokio 1.12.0",
+ "tokio-util",
  "url 2.2.2",
 ]
 
