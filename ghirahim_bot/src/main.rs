@@ -14,10 +14,10 @@ use twitch_irc::TwitchIRCClient;
 
 use nom::{branch::alt, bytes::complete::tag_no_case, Finish};
 
-use tracing::{info, instrument, warn, error, trace, subscriber::set_global_default};
+use tracing::{error, info, instrument, subscriber::set_global_default, trace, warn};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 use tracing_log::LogTracer;
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 
 const LEAVE_NOTICES: [&str; 6] = [
     "msg_banned",
@@ -572,10 +572,8 @@ pub async fn main() {
 
     // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
     LogTracer::init().expect("Failed to set logger");
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new("info")
-    });
-    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), || { std::io::stdout() });
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
     let subscriber = Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)
@@ -584,6 +582,7 @@ pub async fn main() {
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
+        info!("Started Ghirahim_Bot and connected to Twitch.");
         while let Some(message) = incoming_messages.recv().await {
             match message {
                 ServerMessage::Privmsg(message) => {
@@ -598,27 +597,35 @@ pub async fn main() {
                         if let Err(e) = cooldown_status {
                             error!("Database error when checking cooldown: {}", e);
                         } else if !cooldown_status.unwrap() {
-                            let permitted = match db.check_permit(&chan, &message.sender.login).await {
-                                Ok(permitted) => match permitted {
-                                    true => true,
-                                    false => match db.check_permit(&chan, &message.sender.name).await {
-                                        Ok(permitted) => permitted,
-                                        Err(e) => {
-                                            error!("Database error checking permit: {}", e);
-                                            false
+                            let permitted =
+                                match db.check_permit(&chan, &message.sender.login).await {
+                                    Ok(permitted) => match permitted {
+                                        true => true,
+                                        false => {
+                                            match db.check_permit(&chan, &message.sender.name).await
+                                            {
+                                                Ok(permitted) => permitted,
+                                                Err(e) => {
+                                                    error!("Database error checking permit: {}", e);
+                                                    false
+                                                }
+                                            }
                                         }
                                     },
-                                },
-                                Err(e) => {
-                                    error!("Database error checking permit: {}", e);
-                                    false
-                                }
-                            };
+                                    Err(e) => {
+                                        error!("Database error checking permit: {}", e);
+                                        false
+                                    }
+                                };
                             if !permitted && user_role < chan.userlevel {
                                 let (bad_links, bad_regexes) =
-                                    libghirahim::extract_urls(&ext, &message.message_text, &chan).await;
+                                    libghirahim::extract_urls(&ext, &message.message_text, &chan)
+                                        .await;
                                 if let Some(bad_regexes) = bad_regexes {
-                                    info!("Removed the following regexes from {}: {:?}", chan.name, bad_regexes);
+                                    info!(
+                                        "Removed the following regexes from {}: {:?}",
+                                        chan.name, bad_regexes
+                                    );
                                     let mut chan = chan.clone();
                                     chan.allow_list.retain(|x| !bad_regexes.contains(x));
                                     if let Err(e) = db.set_channel(&chan).await {
@@ -629,7 +636,11 @@ pub async fn main() {
                                     }
                                 }
                                 if bad_links.is_some() {
-                                    trace!("Deleting message in {} with ID {}", &message.channel_login, &message.message_id);
+                                    trace!(
+                                        "Deleting message in {} with ID {}",
+                                        &message.channel_login,
+                                        &message.message_id
+                                    );
                                     try_send_privmsg(
                                         &client,
                                         message.channel_login.as_str(),
@@ -637,13 +648,20 @@ pub async fn main() {
                                     )
                                     .await;
                                     let reply = generate_reply(&chan.reply, &message.sender.name);
-                                    try_say(&client, message.channel_login.as_str(), reply.as_str())
-                                        .await;
+                                    try_say(
+                                        &client,
+                                        message.channel_login.as_str(),
+                                        reply.as_str(),
+                                    )
+                                    .await;
                                 }
                             }
                         }
                     } else {
-                        info!("Received message from unknown channel {}", &message.channel_login);
+                        info!(
+                            "Received message from unknown channel {}",
+                            &message.channel_login
+                        );
                         client.part(message.channel_login.clone());
                     }
                 }

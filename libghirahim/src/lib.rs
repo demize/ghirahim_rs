@@ -562,8 +562,8 @@ pub struct GhirahimDB {
 impl std::fmt::Debug for GhirahimDB {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GhirahimDB")
-         .field("mongo_client", &self.mongo_client)
-         .finish_non_exhaustive()
+            .field("mongo_client", &self.mongo_client)
+            .finish_non_exhaustive()
     }
 }
 
