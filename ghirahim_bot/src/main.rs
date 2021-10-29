@@ -1,4 +1,6 @@
+use governor::{Quota, RateLimiter};
 use libghirahim::{GhirahimDB, UserRole};
+use nonzero_ext::*;
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::prelude::*;
@@ -109,11 +111,15 @@ fn generate_reply(reply_str: &str, user: &str) -> String {
 async fn try_send_privmsg<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
+    S: governor::state::StateStore<Key = governor::state::NotKeyed> + std::fmt::Debug,
+    C: governor::clock::Clock + governor::clock::ReasonablyRealtime + std::fmt::Debug,
 >(
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg: &str,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
 ) {
+    limiter.until_ready().await;
     if client
         .privmsg(channel.to_owned(), msg.to_owned())
         .await
@@ -126,11 +132,18 @@ async fn try_send_privmsg<
 }
 
 #[instrument(level = "debug")]
-async fn try_say<T: twitch_irc::transport::Transport, L: twitch_irc::login::LoginCredentials>(
+async fn try_say<
+    T: twitch_irc::transport::Transport,
+    L: twitch_irc::login::LoginCredentials,
+    S: governor::state::StateStore<Key = governor::state::NotKeyed> + std::fmt::Debug,
+    C: governor::clock::Clock + governor::clock::ReasonablyRealtime + std::fmt::Debug,
+>(
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg: &str,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
 ) {
+    limiter.until_ready().await;
     if client
         .say(channel.to_owned(), msg.to_owned())
         .await
@@ -146,12 +159,16 @@ async fn try_say<T: twitch_irc::transport::Transport, L: twitch_irc::login::Logi
 async fn try_respond<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
+    S: governor::state::StateStore<Key = governor::state::NotKeyed> + std::fmt::Debug,
+    C: governor::clock::Clock + governor::clock::ReasonablyRealtime + std::fmt::Debug,
 >(
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg: &str,
     msg_id: &str,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
 ) {
+    limiter.until_ready().await;
     if client
         .say_in_response(channel.to_owned(), msg.to_owned(), Some(msg_id.to_owned()))
         .await
@@ -170,10 +187,13 @@ async fn try_respond<
 async fn send_channel_list<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
+    S: governor::state::StateStore<Key = governor::state::NotKeyed> + std::fmt::Debug,
+    C: governor::clock::Clock + governor::clock::ReasonablyRealtime + std::fmt::Debug,
 >(
     client: &TwitchIRCClient<T, L>,
     msg: &PrivmsgMessage,
     chan: &libghirahim::Channel,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
 ) {
     // Print the list of allowed links in the channel
     let message = format!(
@@ -186,6 +206,7 @@ async fn send_channel_list<
         msg.channel_login.as_str(),
         message.as_str(),
         msg.message_id.as_str(),
+        limiter,
     )
     .await;
 }
@@ -194,11 +215,14 @@ async fn send_channel_list<
 async fn handle_command<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
+    S: governor::state::StateStore<Key = governor::state::NotKeyed> + std::fmt::Debug,
+    C: governor::clock::Clock + governor::clock::ReasonablyRealtime + std::fmt::Debug,
 >(
     db: &GhirahimDB,
     msg: PrivmsgMessage,
     client: TwitchIRCClient<T, L>,
     ext: &TldExtractor,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
 ) {
     if let Ok((args, command)) = parse_command(msg.message_text.as_str()).await.finish() {
         if msg.channel_login != "ghirahim_bot" {
@@ -213,7 +237,9 @@ async fn handle_command<
                     };
                     if let Ok((args, command)) = parse_command_links(args).await.finish() {
                         match command {
-                            "list" => send_channel_list(&client, &msg, &chan).await,
+                            "list" => {
+                                send_channel_list(&client, &msg, &chan, limiter.clone()).await
+                            }
                             "allow" => {
                                 if !args.is_empty() {
                                     let domains = args.split_whitespace();
@@ -226,9 +252,16 @@ async fn handle_command<
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel allow list! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel allow list! Please report this error.",
+                                            msg.message_id.as_str(),
+                                            limiter.clone(),
+                                        ).await;
                                     } else {
-                                        send_channel_list(&client, &msg, &chan).await;
+                                        send_channel_list(&client, &msg, &chan, limiter.clone())
+                                            .await;
                                     }
                                 }
                             }
@@ -239,9 +272,16 @@ async fn handle_command<
                                     chan.allow_list.retain(|x| !domains.contains(&x.as_str()));
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel allow list! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel allow list! Please report this error.",
+                                            msg.message_id.as_str(),
+                                            limiter.clone(),
+                                        ).await;
                                     } else {
-                                        send_channel_list(&client, &msg, &chan).await;
+                                        send_channel_list(&client, &msg, &chan, limiter.clone())
+                                            .await;
                                     }
                                 }
                             }
@@ -258,6 +298,7 @@ async fn handle_command<
                                         msg.channel_login.as_str(),
                                         message.as_str(),
                                         msg.message_id.as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                 } else if let Some(slash) = parse_bool(args).await {
@@ -265,7 +306,13 @@ async fn handle_command<
                                     chan.slash = slash;
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel slash setting! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel slash setting! Please report this error.",
+                                            msg.message_id.as_str(),
+                                            limiter.clone(),
+                                        ).await;
                                     }
                                 }
                             }
@@ -281,6 +328,7 @@ async fn handle_command<
                                         msg.channel_login.as_str(),
                                         message.as_str(),
                                         msg.message_id.as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                 } else if let Some(dot) = parse_bool(args).await {
@@ -288,7 +336,13 @@ async fn handle_command<
                                     chan.dot = dot;
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel dot setting! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel dot setting! Please report this error.",
+                                            msg.message_id.as_str(),
+                                            limiter.clone(),
+                                        ).await;
                                     }
                                 }
                             }
@@ -308,6 +362,7 @@ async fn handle_command<
                                         msg.channel_login.as_str(),
                                         message.as_str(),
                                         msg.message_id.as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                 } else if let Some(subdomains) = parse_bool(args).await {
@@ -315,7 +370,12 @@ async fn handle_command<
                                     chan.subdomains = subdomains;
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel subdomains setting! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel subdomains setting! Please report this error.",
+                                            msg.message_id.as_str(),
+                                            limiter.clone()).await;
                                     }
                                 }
                             }
@@ -330,6 +390,7 @@ async fn handle_command<
                                         msg.channel_login.as_str(),
                                         message.as_str(),
                                         msg.message_id.as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                 } else if let Ok(role) = UserRole::from_str(args) {
@@ -337,7 +398,13 @@ async fn handle_command<
                                     chan.userlevel = role;
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel role setting! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel role setting! Please report this error.",
+                                            msg.message_id.as_str(),
+                                            limiter.clone(),
+                                        ).await;
                                     }
                                 }
                             }
@@ -354,6 +421,7 @@ async fn handle_command<
                                         msg.channel_login.as_str(),
                                         message.as_str(),
                                         msg.message_id.as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                 } else {
@@ -383,13 +451,19 @@ async fn handle_command<
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
-                                        try_respond(&client, msg.channel_login.as_str(), "Could not update channel reply! Please report this error.", msg.message_id.as_str()).await;
+                                        try_respond(
+                                            &client,
+                                            msg.channel_login.as_str(),
+                                            "Could not update channel reply! Please report this error.",
+                                            msg.message_id.as_str(), limiter.clone(),
+                                        ).await;
                                     } else {
                                         try_respond(
                                             &client,
                                             msg.channel_login.as_str(),
                                             bot_reply.as_str(),
                                             msg.message_id.as_str(),
+                                            limiter.clone(),
                                         )
                                         .await;
                                     }
@@ -413,6 +487,7 @@ async fn handle_command<
                                     msg.channel_login.as_str(),
                                     message.as_str(),
                                     msg.message_id.as_str(),
+                                    limiter.clone(),
                                 )
                                 .await;
                             }
@@ -436,6 +511,7 @@ async fn handle_command<
                                 msg.channel_login.as_str(),
                                 "Could not issue permit! Please report this error.",
                                 msg.message_id.as_str(),
+                                limiter.clone(),
                             )
                             .await;
                         } else {
@@ -448,6 +524,7 @@ async fn handle_command<
                                 msg.channel_login.as_str(),
                                 reply.as_str(),
                                 msg.message_id.as_str(),
+                                limiter.clone(),
                             )
                             .await;
                         }
@@ -478,6 +555,7 @@ async fn handle_command<
                                 "ghirahim_bot",
                                 "Error joining channel! Please report this error.",
                                 msg.message_id.as_str(),
+                                limiter.clone(),
                             )
                             .await;
                         } else {
@@ -487,6 +565,7 @@ async fn handle_command<
                                 "ghirahim_bot",
                                 "Joined channel. Remember to set up your settings and allow list!",
                                 msg.message_id.as_str(),
+                                limiter.clone(),
                             )
                             .await;
                         }
@@ -503,6 +582,7 @@ async fn handle_command<
                             "ghirahim_bot",
                             "Left channel.",
                             msg.message_id.as_str(),
+                            limiter.clone(),
                         )
                         .await;
                     }
@@ -547,6 +627,10 @@ pub async fn main() {
         connection_rate_limiter: Arc::new(Semaphore::new(2)), // Open two connections at once, if necessary
         ..Default::default()
     };
+
+    // Set up the rate limiter
+    let limiter = Arc::new(RateLimiter::direct(Quota::per_second(nonzero!(3u32))));
+
     // Set up the IRC client
     let (mut incoming_messages, client) =
         TwitchIRCClient::<SecureWSTransport, StaticLoginCredentials>::new(irc_config);
@@ -595,8 +679,9 @@ pub async fn main() {
                             let cooldown_status = db.check_channel_cooldown(&chan).await;
                             if let Err(e) = cooldown_status {
                                 error!("Database error when checking cooldown: {}", e);
-                            } else if !cooldown_status.unwrap()  {
-                                handle_command(&db, message, client.clone(), &ext).await;
+                            } else if !cooldown_status.unwrap() {
+                                handle_command(&db, message, client.clone(), &ext, limiter.clone())
+                                    .await;
                             }
                         }
                     } else if let Some(chan) = db.get_channel(&message.channel_login).await {
@@ -652,6 +737,7 @@ pub async fn main() {
                                         &client,
                                         message.channel_login.as_str(),
                                         format!("/delete {}", message.message_id).as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                     let reply = generate_reply(&chan.reply, &message.sender.name);
@@ -659,6 +745,7 @@ pub async fn main() {
                                         &client,
                                         message.channel_login.as_str(),
                                         reply.as_str(),
+                                        limiter.clone(),
                                     )
                                     .await;
                                 }
