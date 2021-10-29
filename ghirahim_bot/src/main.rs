@@ -14,6 +14,37 @@ use twitch_irc::TwitchIRCClient;
 
 use nom::{branch::alt, bytes::complete::tag_no_case, Finish};
 
+use tracing::{info, instrument, warn, error, trace, subscriber::set_global_default};
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
+use tracing_log::LogTracer;
+
+const LEAVE_NOTICES: [&str; 6] = [
+    "msg_banned",
+    "msg_channel_blocked",
+    "msg_room_not_found",
+    "msg_timedout",
+    "msg_verified_email",
+    "tos_ban",
+];
+
+const COOLDOWN_NOTICES: [&str; 13] = [
+    "msg_duplicate",
+    "msg_emoteonly",
+    "msg_facebook",
+    "msg_followersonly",
+    "msg_followersonly_followed",
+    "msg_followersonly_zero",
+    "msg_r9k",
+    "msg_ratelimit",
+    "msg_rejected",
+    "msg_rejected_mandatory",
+    "msg_slowmode",
+    "msg_subsonly",
+    "no_permission",
+];
+
+#[instrument]
 async fn parse_command(msg: &str) -> nom::IResult<&str, &str> {
     alt((
         tag_no_case("!links"),
@@ -23,6 +54,7 @@ async fn parse_command(msg: &str) -> nom::IResult<&str, &str> {
     ))(msg.trim())
 }
 
+#[instrument]
 async fn parse_command_links(args: &str) -> nom::IResult<&str, &str> {
     alt((
         tag_no_case("list"),
@@ -37,6 +69,7 @@ async fn parse_command_links(args: &str) -> nom::IResult<&str, &str> {
     ))(args.trim())
 }
 
+#[instrument]
 async fn parse_bool_inner(args: &str) -> nom::IResult<&str, &str> {
     alt((
         tag_no_case("true"),
@@ -48,6 +81,7 @@ async fn parse_bool_inner(args: &str) -> nom::IResult<&str, &str> {
     ))(args.trim())
 }
 
+#[instrument]
 async fn parse_bool(args: &str) -> Option<bool> {
     match parse_bool_inner(args).await {
         Err(_) => None,
@@ -59,6 +93,7 @@ async fn parse_bool(args: &str) -> Option<bool> {
     }
 }
 
+#[instrument]
 fn generate_reply(reply_str: &str, user: &str) -> String {
     if reply_str == "default" {
         format!(
@@ -70,6 +105,7 @@ fn generate_reply(reply_str: &str, user: &str) -> String {
     }
 }
 
+#[instrument]
 async fn try_send_privmsg<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -84,11 +120,12 @@ async fn try_send_privmsg<
         .is_err()
     {
         if let Err(e) = client.privmsg(channel.to_owned(), msg.to_owned()).await {
-            println!("Error sending message: {}", e);
+            warn!("Error sending message: {}", e);
         }
     }
 }
 
+#[instrument]
 async fn try_say<T: twitch_irc::transport::Transport, L: twitch_irc::login::LoginCredentials>(
     client: &TwitchIRCClient<T, L>,
     channel: &str,
@@ -100,11 +137,12 @@ async fn try_say<T: twitch_irc::transport::Transport, L: twitch_irc::login::Logi
         .is_err()
     {
         if let Err(e) = client.say(channel.to_owned(), msg.to_owned()).await {
-            println!("Error sending message: {}", e);
+            warn!("Error sending message: {}", e);
         }
     }
 }
 
+#[instrument]
 async fn try_respond<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -123,11 +161,12 @@ async fn try_respond<
             .say_in_response(channel.to_owned(), msg.to_owned(), Some(msg_id.to_owned()))
             .await
         {
-            println!("Error sending message: {}", e);
+            warn!("Error sending message: {}", e);
         }
     }
 }
 
+#[instrument]
 async fn send_channel_list<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -151,6 +190,7 @@ async fn send_channel_list<
     .await;
 }
 
+#[instrument(skip(ext))]
 async fn handle_command<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -185,7 +225,7 @@ async fn handle_command<
                                         }
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel allow list! Please report this error.", msg.message_id.as_str()).await;
                                     } else {
                                         send_channel_list(&client, &msg, &chan).await;
@@ -198,7 +238,7 @@ async fn handle_command<
                                     let mut chan = chan.clone();
                                     chan.allow_list.retain(|x| !domains.contains(&x.as_str()));
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel allow list! Please report this error.", msg.message_id.as_str()).await;
                                     } else {
                                         send_channel_list(&client, &msg, &chan).await;
@@ -224,7 +264,7 @@ async fn handle_command<
                                     let mut chan = chan.clone();
                                     chan.slash = slash;
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel slash setting! Please report this error.", msg.message_id.as_str()).await;
                                     }
                                 }
@@ -247,7 +287,7 @@ async fn handle_command<
                                     let mut chan = chan.clone();
                                     chan.dot = dot;
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel dot setting! Please report this error.", msg.message_id.as_str()).await;
                                     }
                                 }
@@ -274,7 +314,7 @@ async fn handle_command<
                                     let mut chan = chan.clone();
                                     chan.subdomains = subdomains;
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel subdomains setting! Please report this error.", msg.message_id.as_str()).await;
                                     }
                                 }
@@ -296,7 +336,7 @@ async fn handle_command<
                                     let mut chan = chan.clone();
                                     chan.userlevel = role;
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel role setting! Please report this error.", msg.message_id.as_str()).await;
                                     }
                                 }
@@ -342,7 +382,7 @@ async fn handle_command<
                                         );
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
-                                        println!("Error setting channel: {}", e);
+                                        error!("Error setting channel: {}", e);
                                         try_respond(&client, msg.channel_login.as_str(), "Could not update channel reply! Please report this error.", msg.message_id.as_str()).await;
                                     } else {
                                         try_respond(
@@ -390,7 +430,7 @@ async fn handle_command<
                             }
                         };
                         if let Err(e) = db.issue_permit(&chan, args).await {
-                            println!("Error issuing permit: {}", e);
+                            error!("Error issuing permit: {}", e);
                             try_respond(
                                 &client,
                                 msg.channel_login.as_str(),
@@ -429,7 +469,7 @@ async fn handle_command<
                             })
                             .await
                         {
-                            println!(
+                            error!(
                                 "Database error joining channel {}: {}",
                                 &msg.sender.login, e
                             );
@@ -441,6 +481,7 @@ async fn handle_command<
                             )
                             .await;
                         } else {
+                            info!("Joined channel {}", &msg.sender.login);
                             try_respond(
                                 &client,
                                 "ghirahim_bot",
@@ -454,6 +495,7 @@ async fn handle_command<
                 "!leave" => {
                     // Leave the channel of the user who sent the message
                     client.part(msg.sender.login.clone());
+                    info!("Left channel {}", &msg.sender.login);
                     if let Some(chan) = db.get_channel(&msg.sender.login).await {
                         db.del_channel(&chan).await;
                         try_respond(
@@ -528,64 +570,106 @@ pub async fn main() {
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     client.set_wanted_channels(channels);
 
+    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
+    LogTracer::init().expect("Failed to set logger");
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new("info")
+    });
+    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), || { std::io::stdout() });
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+    set_global_default(subscriber).expect("Failed to set subscriber");
+
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
         while let Some(message) = incoming_messages.recv().await {
             match message {
                 ServerMessage::Privmsg(message) => {
-                    println!("Received privmsg: {:?}", message);
+                    trace!("Received privmsg: {:?}", message);
                     let user_role = libghirahim::parse_badges(message.badges.clone());
                     if (user_role >= UserRole::MODERATOR)
                         || (message.channel_login == "ghirahim_bot")
                     {
                         handle_command(&db, message, client.clone(), &ext).await;
                     } else if let Some(chan) = db.get_channel(&message.channel_login).await {
-                        let permitted = match db.check_permit(&chan, &message.sender.login).await {
-                            Ok(permitted) => match permitted {
-                                true => true,
-                                false => match db.check_permit(&chan, &message.sender.name).await {
-                                    Ok(permitted) => permitted,
-                                    Err(e) => {
-                                        println!("Database error checking permit: {}", e);
-                                        false
-                                    }
+                        let cooldown_status = db.check_channel_cooldown(&chan).await;
+                        if let Err(e) = cooldown_status {
+                            error!("Database error when checking cooldown: {}", e);
+                        } else if !cooldown_status.unwrap() {
+                            let permitted = match db.check_permit(&chan, &message.sender.login).await {
+                                Ok(permitted) => match permitted {
+                                    true => true,
+                                    false => match db.check_permit(&chan, &message.sender.name).await {
+                                        Ok(permitted) => permitted,
+                                        Err(e) => {
+                                            error!("Database error checking permit: {}", e);
+                                            false
+                                        }
+                                    },
                                 },
-                            },
-                            Err(e) => {
-                                println!("Database error checking permit: {}", e);
-                                false
-                            }
-                        };
-                        if !permitted && user_role < chan.userlevel {
-                            let (bad_links, bad_regexes) =
-                                libghirahim::extract_urls(&ext, &message.message_text, &chan).await;
-                            if let Some(bad_regexes) = bad_regexes {
-                                let mut chan = chan.clone();
-                                chan.allow_list.retain(|x| !bad_regexes.contains(x));
-                                if let Err(e) = db.set_channel(&chan).await {
-                                    println!(
-                                        "Database error updating channel {}: {}",
-                                        &message.channel_login, e
-                                    );
+                                Err(e) => {
+                                    error!("Database error checking permit: {}", e);
+                                    false
                                 }
-                            }
-                            if bad_links.is_some() {
-                                try_send_privmsg(
-                                    &client,
-                                    message.channel_login.as_str(),
-                                    format!("/delete {}", message.message_id).as_str(),
-                                )
-                                .await;
-                                let reply = generate_reply(&chan.reply, &message.sender.name);
-                                try_say(&client, message.channel_login.as_str(), reply.as_str())
+                            };
+                            if !permitted && user_role < chan.userlevel {
+                                let (bad_links, bad_regexes) =
+                                    libghirahim::extract_urls(&ext, &message.message_text, &chan).await;
+                                if let Some(bad_regexes) = bad_regexes {
+                                    info!("Removed the following regexes from {}: {:?}", chan.name, bad_regexes);
+                                    let mut chan = chan.clone();
+                                    chan.allow_list.retain(|x| !bad_regexes.contains(x));
+                                    if let Err(e) = db.set_channel(&chan).await {
+                                        error!(
+                                            "Database error updating channel {}: {}",
+                                            &message.channel_login, e
+                                        );
+                                    }
+                                }
+                                if bad_links.is_some() {
+                                    trace!("Deleting message in {} with ID {}", &message.channel_login, &message.message_id);
+                                    try_send_privmsg(
+                                        &client,
+                                        message.channel_login.as_str(),
+                                        format!("/delete {}", message.message_id).as_str(),
+                                    )
                                     .await;
+                                    let reply = generate_reply(&chan.reply, &message.sender.name);
+                                    try_say(&client, message.channel_login.as_str(), reply.as_str())
+                                        .await;
+                                }
                             }
                         }
                     } else {
+                        info!("Received message from unknown channel {}", &message.channel_login);
                         client.part(message.channel_login.clone());
                     }
                 }
-                _ => println!("Received message: {:?}", message),
+                ServerMessage::Notice(message) => {
+                    if let Some(message_id) = message.message_id.clone() {
+                        if LEAVE_NOTICES.contains(&message_id.as_str()) {
+                            error!("Received notice in leave list: {:?}", message);
+                            let channel_login = message.channel_login.unwrap();
+                            client.part(channel_login.clone());
+                            if let Some(chan) = db.get_channel(&channel_login).await {
+                                db.del_channel(&chan).await;
+                            }
+                        } else if COOLDOWN_NOTICES.contains(&message_id.as_str()) {
+                            error!("Received notice in cooldown list: {:?}", message);
+                            let channel_login = message.channel_login.unwrap();
+                            if let Some(chan) = db.get_channel(&channel_login).await {
+                                if let Err(e) = db.set_channel_cooldown(&chan).await {
+                                    error!("Database error setting cooldown: {}", e);
+                                }
+                            } else {
+                                client.part(channel_login.clone());
+                            }
+                        }
+                    }
+                }
+                _ => trace!("Received message: {:?}", message),
             }
         }
     });
