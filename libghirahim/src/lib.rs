@@ -386,7 +386,7 @@ impl Default for Channel {
 }
 
 /// Given the list of a user's Badges, return the highest role they represent.
-#[instrument(skip(badges))]
+#[instrument(skip(badges), level = "debug")]
 pub fn parse_badges(badges: impl IntoIterator<Item = Badge>) -> UserRole {
     let mut role = UserRole::USER;
 
@@ -408,7 +408,7 @@ pub fn parse_badges(badges: impl IntoIterator<Item = Badge>) -> UserRole {
 
 /// A helper function to match a regular expression. This is marked as async, but it's actually
 /// blocking, so to use it properly it needs to be spawned as a task.
-#[instrument]
+#[instrument(level = "debug")]
 async fn match_regex(message: String, regex: String) -> Result<bool, regex::Error> {
     // Strip the slashes off the front and back of the allow list entry
     let mut regex_inner = regex.chars();
@@ -425,7 +425,7 @@ async fn match_regex(message: String, regex: String) -> Result<bool, regex::Erro
 /// Extract all of the "bad" URLs from a given message. Returns a tuple of Options containing
 /// Vecs, (bad_links, bad_regexes), where bad_links are links not on the allow list in the
 /// given channel and bad_regexes are regex entries that failed to run (timed out or excepted).
-#[instrument(skip(ext))]
+#[instrument(skip(ext), level = "debug")]
 pub async fn extract_urls(
     ext: &TldExtractor,
     message: &str,
@@ -570,7 +570,7 @@ impl std::fmt::Debug for GhirahimDB {
 impl GhirahimDB {
     /// Creates a new database object.
     /// Uses the specified connect strings to connect to Mongo and Redis.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn new(
         mongo_connect: &str,
         redis_connect: &str,
@@ -587,7 +587,7 @@ impl GhirahimDB {
         })
     }
 
-    #[instrument]
+    #[instrument(level = "debug")]
     async fn get_channel_redis(&self, name: &str) -> Option<Channel> {
         if let Ok(json) = self.redis_client.clone().get::<&str, String>(name).await {
             let c: Channel = serde_json::from_str(&json).expect("Couldn't deserialize channel");
@@ -596,7 +596,7 @@ impl GhirahimDB {
         None
     }
 
-    #[instrument]
+    #[instrument(level = "debug")]
     async fn get_channel_mongo(&self, name: &str) -> Option<Channel> {
         let collection = self
             .mongo_client
@@ -612,7 +612,7 @@ impl GhirahimDB {
 
     /// Gets the channel with the specified name.
     /// Queries Redis first; if the Redis query fails, then moves on to Mongo.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn get_channel(&self, name: &str) -> Option<Channel> {
         if let Some(channel) = self.get_channel_redis(name).await {
             return Some(channel);
@@ -630,7 +630,7 @@ impl GhirahimDB {
 
     /// Gets the list of all channels (as a hashset of strings) from Mongo.
     /// Does not touch Redis.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn get_all_channels(&self) -> mongodb::error::Result<HashSet<String>> {
         let collection = self
             .mongo_client
@@ -645,14 +645,14 @@ impl GhirahimDB {
         Ok(channels)
     }
 
-    #[instrument]
+    #[instrument(level = "debug")]
     async fn set_channel_redis(&self, name: &str, json: &str) -> redis::RedisResult<()> {
         // Awkward format, but required by Redis
         let _: () = self.redis_client.clone().set_ex(name, json, 1800).await?;
         Ok(())
     }
 
-    #[instrument]
+    #[instrument(level = "debug")]
     async fn set_channel_mongo(
         &self,
         chan: &Channel,
@@ -670,7 +670,7 @@ impl GhirahimDB {
 
     /// Sets a channel in Mongo and Redis.
     /// If the channel exists, it will be updated; if it does not, it will be inserted.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn set_channel(
         &self,
         chan: &Channel,
@@ -682,7 +682,7 @@ impl GhirahimDB {
     }
 
     /// Deletes a channel in Mongo and Redis.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn del_channel(&self, chan: &Channel) {
         let collection = self
             .mongo_client
@@ -702,7 +702,7 @@ impl GhirahimDB {
     }
 
     /// Issues a permit for the specified user in the specified channel.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn issue_permit(&self, chan: &Channel, user: &str) -> redis::RedisResult<()> {
         let key = format!("permit:{}:{}", chan.name, user);
         let _: () = self.redis_client.clone().set_ex(key, true, 300).await?;
@@ -710,7 +710,7 @@ impl GhirahimDB {
     }
 
     /// Checks whether the specified user has a permit in the specified channel.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn check_permit(&self, chan: &Channel, user: &str) -> redis::RedisResult<bool> {
         let user = if let Some(stripped) = user.strip_prefix('@') {
             stripped
@@ -734,11 +734,11 @@ impl GhirahimDB {
     }
 
     /// Check whether a channel is on cooldown.
-    #[instrument]
+    #[instrument(level = "debug")]
     pub async fn check_channel_cooldown(&self, chan: &Channel) -> redis::RedisResult<bool> {
         let key = format!("cooldown:{}", chan.name);
         match self.redis_client.clone().get::<String, bool>(key).await {
-            Ok(_) => Ok(true),
+            Ok(cooldown) => Ok(cooldown),
             Err(_) => Ok(false),
         }
     }

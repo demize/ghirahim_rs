@@ -44,7 +44,7 @@ const COOLDOWN_NOTICES: [&str; 13] = [
     "no_permission",
 ];
 
-#[instrument]
+#[instrument(level = "trace")]
 async fn parse_command(msg: &str) -> nom::IResult<&str, &str> {
     alt((
         tag_no_case("!links"),
@@ -54,7 +54,7 @@ async fn parse_command(msg: &str) -> nom::IResult<&str, &str> {
     ))(msg.trim())
 }
 
-#[instrument]
+#[instrument(level = "trace")]
 async fn parse_command_links(args: &str) -> nom::IResult<&str, &str> {
     alt((
         tag_no_case("list"),
@@ -69,7 +69,7 @@ async fn parse_command_links(args: &str) -> nom::IResult<&str, &str> {
     ))(args.trim())
 }
 
-#[instrument]
+#[instrument(level = "trace")]
 async fn parse_bool_inner(args: &str) -> nom::IResult<&str, &str> {
     alt((
         tag_no_case("true"),
@@ -81,7 +81,7 @@ async fn parse_bool_inner(args: &str) -> nom::IResult<&str, &str> {
     ))(args.trim())
 }
 
-#[instrument]
+#[instrument(level = "trace")]
 async fn parse_bool(args: &str) -> Option<bool> {
     match parse_bool_inner(args).await {
         Err(_) => None,
@@ -93,7 +93,7 @@ async fn parse_bool(args: &str) -> Option<bool> {
     }
 }
 
-#[instrument]
+#[instrument(level = "debug")]
 fn generate_reply(reply_str: &str, user: &str) -> String {
     if reply_str == "default" {
         format!(
@@ -105,7 +105,7 @@ fn generate_reply(reply_str: &str, user: &str) -> String {
     }
 }
 
-#[instrument]
+#[instrument(level = "debug")]
 async fn try_send_privmsg<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -125,7 +125,7 @@ async fn try_send_privmsg<
     }
 }
 
-#[instrument]
+#[instrument(level = "debug")]
 async fn try_say<T: twitch_irc::transport::Transport, L: twitch_irc::login::LoginCredentials>(
     client: &TwitchIRCClient<T, L>,
     channel: &str,
@@ -142,7 +142,7 @@ async fn try_say<T: twitch_irc::transport::Transport, L: twitch_irc::login::Logi
     }
 }
 
-#[instrument]
+#[instrument(level = "debug")]
 async fn try_respond<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -166,7 +166,7 @@ async fn try_respond<
     }
 }
 
-#[instrument]
+#[instrument(level = "debug")]
 async fn send_channel_list<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -190,7 +190,7 @@ async fn send_channel_list<
     .await;
 }
 
-#[instrument(skip(ext))]
+#[instrument(skip(ext), level = "debug")]
 async fn handle_command<
     T: twitch_irc::transport::Transport,
     L: twitch_irc::login::LoginCredentials,
@@ -591,7 +591,14 @@ pub async fn main() {
                     if (user_role >= UserRole::MODERATOR)
                         || (message.channel_login == "ghirahim_bot")
                     {
-                        handle_command(&db, message, client.clone(), &ext).await;
+                        if let Some(chan) = db.get_channel(&message.channel_login).await {
+                            let cooldown_status = db.check_channel_cooldown(&chan).await;
+                            if let Err(e) = cooldown_status {
+                                error!("Database error when checking cooldown: {}", e);
+                            } else if !cooldown_status.unwrap()  {
+                                handle_command(&db, message, client.clone(), &ext).await;
+                            }
+                        }
                     } else if let Some(chan) = db.get_channel(&message.channel_login).await {
                         let cooldown_status = db.check_channel_cooldown(&chan).await;
                         if let Err(e) = cooldown_status {
