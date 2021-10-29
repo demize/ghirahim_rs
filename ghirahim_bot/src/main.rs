@@ -16,7 +16,7 @@ use twitch_irc::TwitchIRCClient;
 
 use nom::{branch::alt, bytes::complete::tag_no_case, Finish};
 
-use tracing::{error, info, instrument, subscriber::set_global_default, trace, warn};
+use tracing::{debug, error, info, instrument, subscriber::set_global_default, trace, warn};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
@@ -778,10 +778,12 @@ pub async fn main() {
                             } else {
                                 client.part(channel_login.clone());
                             }
+                        } else {
+                            info!("Received unknown notice: {:?}", message);
                         }
                     }
                 }
-                _ => trace!("Received message: {:?}", message),
+                _ => debug!("Received message: {:?}", message),
             }
         }
     });
