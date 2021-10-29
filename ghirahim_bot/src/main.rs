@@ -683,6 +683,9 @@ pub async fn main() {
                                 handle_command(&db, message, client.clone(), &ext, limiter.clone())
                                     .await;
                             }
+                        } else if message.channel_login == "ghirahim_bot" {
+                            handle_command(&db, message, client.clone(), &ext, limiter.clone())
+                                .await;
                         }
                     } else if let Some(chan) = db.get_channel(&message.channel_login).await {
                         let cooldown_status = db.check_channel_cooldown(&chan).await;
@@ -778,7 +781,9 @@ pub async fn main() {
                             } else {
                                 client.part(channel_login.clone());
                             }
-                        } else if message.message_id.is_some() && message.message_id.clone().unwrap() != "delete_message_success" {
+                        } else if message.message_id.is_some()
+                            && message.message_id.clone().unwrap() != "delete_message_success"
+                        {
                             info!("Received unknown notice: {:?}", message);
                         }
                     }

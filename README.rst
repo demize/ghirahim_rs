@@ -108,4 +108,4 @@ All config is kept in ``girahim.yaml``. Copy ``ghirahim.yaml.sample`` to ``ghira
 Running the bot
 ^^^^^^^^^^^^^^^
 
-The executable produced by cargo (target/*/ghirahim_bot) can be copied out of the target directory and run directly. Running the bot under its own account is recommended. It can be easily run as a service with a basic systemd unit file; it does not fork, so it should be run with exec, and it will print all log messages to stdout to be caught and logged by systemd. You should probably build it with the ``--release`` flag for optimizations, especially if running it on a relatively low-powered server.
+The executable produced by cargo (target/\*/ghirahim_bot) can be copied out of the target directory and run directly. Running the bot under its own account is recommended. It can be easily run as a service with a basic systemd unit file; it does not fork, so it should be run with exec, and it will print all log messages to stdout to be caught and logged by systemd. You should probably build it with the ``--release`` flag for optimizations, especially if running it on a relatively low-powered server.
