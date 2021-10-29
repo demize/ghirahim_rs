@@ -504,7 +504,7 @@ async fn handle_command<
                                 return;
                             }
                         };
-                        if let Err(e) = db.issue_permit(&chan, args).await {
+                        if let Err(e) = db.issue_permit(&chan, args.trim()).await {
                             error!("Error issuing permit: {}", e);
                             try_respond(
                                 &client,
@@ -778,7 +778,7 @@ pub async fn main() {
                             } else {
                                 client.part(channel_login.clone());
                             }
-                        } else {
+                        } else if message.message_id.is_some() && message.message_id.clone().unwrap() != "delete_message_success" {
                             info!("Received unknown notice: {:?}", message);
                         }
                     }
