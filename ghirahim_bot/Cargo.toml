@@ -13,4 +13,5 @@ serde_yaml = "0.8.21"
 tldextract = "0.5.1"
 tempfile = "3.2.0"
 libghirahim = { path = "../libghirahim" }
+nom = "7.0.0"
 workspace-hack = { path = "../workspace-hack"}

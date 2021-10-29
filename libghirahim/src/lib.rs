@@ -10,6 +10,7 @@ use redis::AsyncCommands;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::default::Default;
 use std::error;
 use std::str::FromStr;
 use std::time::Duration;
@@ -338,7 +339,15 @@ mod tests {
 
 /// Represents a user's role in chat.
 #[derive(
-    PartialEq, PartialOrd, Debug, strum::EnumString, strum::Display, Serialize, Deserialize,
+    PartialEq,
+    PartialOrd,
+    Debug,
+    strum::EnumString,
+    strum::Display,
+    Serialize,
+    Deserialize,
+    Copy,
+    Clone,
 )]
 pub enum UserRole {
     USER,
@@ -349,7 +358,7 @@ pub enum UserRole {
 }
 
 /// Represents a Twitch channel the bot has joined.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Channel {
     pub name: String,
     pub slash: bool,
@@ -358,6 +367,20 @@ pub struct Channel {
     pub userlevel: UserRole,
     pub reply: String,
     pub allow_list: Vec<String>,
+}
+
+impl Default for Channel {
+    fn default() -> Self {
+        Channel {
+            name: "".to_owned(),
+            slash: true,
+            dot: true,
+            subdomains: true,
+            userlevel: UserRole::VIP,
+            reply: "default".to_owned(),
+            allow_list: Vec::new(),
+        }
+    }
 }
 
 /// Given the list of a user's Badges, return the highest role they represent.
@@ -528,7 +551,7 @@ pub async fn extract_urls(
 /// Contain a Redis and Mongo client for working with the database
 pub struct GhirahimDB {
     mongo_client: mongodb::Client,
-    redis_client: redis::aio::Connection,
+    redis_client: redis::aio::ConnectionManager,
 }
 
 impl GhirahimDB {
@@ -537,13 +560,12 @@ impl GhirahimDB {
     pub async fn new(
         mongo_connect: &str,
         redis_connect: &str,
-    ) -> Result<GhirahimDB, Box<dyn error::Error>> {
+    ) -> Result<GhirahimDB, Box<dyn error::Error + Send + Sync>> {
         let mongo_client_options = mongodb::options::ClientOptions::parse(mongo_connect).await?;
         let mongo_client = mongodb::Client::with_options(mongo_client_options)?;
 
-        let redis_client = redis::Client::open(redis_connect)?
-            .get_tokio_connection()
-            .await?;
+        let redis_client =
+            redis::aio::ConnectionManager::new(redis::Client::open(redis_connect)?).await?;
 
         Ok(GhirahimDB {
             mongo_client,
@@ -551,10 +573,9 @@ impl GhirahimDB {
         })
     }
 
-    async fn get_channel_redis(&mut self, name: &str) -> Option<Channel> {
-        if let Ok(json) = self.redis_client.get::<&str, String>(name).await {
-            let c: Channel =
-                serde_json::from_str(&json).expect("Couldn't deserialize channel");
+    async fn get_channel_redis(&self, name: &str) -> Option<Channel> {
+        if let Ok(json) = self.redis_client.clone().get::<&str, String>(name).await {
+            let c: Channel = serde_json::from_str(&json).expect("Couldn't deserialize channel");
             return Some(c);
         }
         None
@@ -575,7 +596,7 @@ impl GhirahimDB {
 
     /// Gets the channel with the specified name.
     /// Queries Redis first; if the Redis query fails, then moves on to Mongo.
-    pub async fn get_channel(&mut self, name: &str) -> Option<Channel> {
+    pub async fn get_channel(&self, name: &str) -> Option<Channel> {
         if let Some(channel) = self.get_channel_redis(name).await {
             return Some(channel);
         }
@@ -592,7 +613,7 @@ impl GhirahimDB {
 
     /// Gets the list of all channels (as a hashset of strings) from Mongo.
     /// Does not touch Redis.
-    pub async fn get_all_channels(&mut self) -> mongodb::error::Result<HashSet<String>> {
+    pub async fn get_all_channels(&self) -> mongodb::error::Result<HashSet<String>> {
         let collection = self
             .mongo_client
             .database("Ghirahim")
@@ -606,9 +627,9 @@ impl GhirahimDB {
         Ok(channels)
     }
 
-    async fn set_channel_redis(&mut self, name: &str, json: &str) -> redis::RedisResult<()> {
+    async fn set_channel_redis(&self, name: &str, json: &str) -> redis::RedisResult<()> {
         // Awkward format, but required by Redis
-        let _: () = self.redis_client.set_ex(name, json, 1800).await?;
+        let _: () = self.redis_client.clone().set_ex(name, json, 1800).await?;
         Ok(())
     }
 
@@ -629,7 +650,10 @@ impl GhirahimDB {
 
     /// Sets a channel in Mongo and Redis.
     /// If the channel exists, it will be updated; if it does not, it will be inserted.
-    pub async fn set_channel(&mut self, chan: &Channel) -> Result<(), Box<dyn error::Error>> {
+    pub async fn set_channel(
+        &self,
+        chan: &Channel,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         let chan_json = serde_json::to_string(&chan).unwrap();
         self.set_channel_redis(&chan.name, &chan_json).await?;
         self.set_channel_mongo(chan).await?;
@@ -637,7 +661,7 @@ impl GhirahimDB {
     }
 
     /// Deletes a channel in Mongo and Redis.
-    pub async fn del_channel(&mut self, chan: &Channel) {
+    pub async fn del_channel(&self, chan: &Channel) {
         let collection = self
             .mongo_client
             .database("Ghirahim")
@@ -649,38 +673,44 @@ impl GhirahimDB {
             .expect("Mongo error when deleting record");
         let _: () = self
             .redis_client
+            .clone()
             .del(&chan.name)
             .await
             .expect("Redis error when deleting record");
     }
 
     /// Issues a permit for the specified user in the specified channel.
-    pub async fn issue_permit(&mut self, chan: &Channel, user: &str) -> redis::RedisResult<()> {
+    pub async fn issue_permit(&self, chan: &Channel, user: &str) -> redis::RedisResult<()> {
         let key = format!("permit:{}:{}", chan.name, user);
-        let _: () = self.redis_client.set_ex(key, true, 300).await?;
+        let _: () = self.redis_client.clone().set_ex(key, true, 300).await?;
         Ok(())
     }
 
     /// Checks whether the specified user has a permit in the specified channel.
-    pub async fn check_permit(&mut self, chan: &Channel, user: &str) -> redis::RedisResult<bool> {
+    pub async fn check_permit(&self, chan: &Channel, user: &str) -> redis::RedisResult<bool> {
+        let user = if let Some(stripped) = user.strip_prefix('@') {
+            stripped
+        } else {
+            user
+        };
         let key = format!("permit:{}:{}", chan.name, user);
-        match self.redis_client.get::<String, bool>(key).await {
+        match self.redis_client.clone().get::<String, bool>(key).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
     }
 
     /// Put a channel on cooldown.
-    pub async fn set_channel_cooldown(&mut self, chan: &Channel) -> redis::RedisResult<()> {
+    pub async fn set_channel_cooldown(&self, chan: &Channel) -> redis::RedisResult<()> {
         let key = format!("cooldown:{}", chan.name);
-        let _: () = self.redis_client.set_ex(key, true, 300).await?;
+        let _: () = self.redis_client.clone().set_ex(key, true, 300).await?;
         Ok(())
     }
 
     /// Check whether a channel is on cooldown.
-    pub async fn check_channel_cooldown(&mut self, chan: &Channel) -> redis::RedisResult<bool> {
+    pub async fn check_channel_cooldown(&self, chan: &Channel) -> redis::RedisResult<bool> {
         let key = format!("cooldown:{}", chan.name);
-        match self.redis_client.get::<String, bool>(key).await {
+        match self.redis_client.clone().get::<String, bool>(key).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
