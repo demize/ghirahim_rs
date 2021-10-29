@@ -286,24 +286,11 @@ async fn handle_command<
                                 }
                             }
                             "slash" => {
-                                // If args is empty, print whether slash is currently enabled
-                                if args.is_empty() {
-                                    let message = format!(
-                                        "Slash matching is currently {} in {}.",
-                                        if chan.slash { "enabled" } else { "not enabled" },
-                                        msg.channel_login
-                                    );
-                                    try_respond(
-                                        &client,
-                                        msg.channel_login.as_str(),
-                                        message.as_str(),
-                                        msg.message_id.as_str(),
-                                        limiter.clone(),
-                                    )
-                                    .await;
-                                } else if let Some(slash) = parse_bool(args).await {
+                                let mut enabled = if chan.slash { "enabled" } else { "not enabled" };
+                                if let Some(slash) = parse_bool(args).await {
                                     let mut chan = chan.clone();
                                     chan.slash = slash;
+                                    enabled = if slash { "enabled" } else { "not enabled" };
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
                                         try_respond(
@@ -315,25 +302,27 @@ async fn handle_command<
                                         ).await;
                                     }
                                 }
+                                // Always print the current setting
+                                let message = format!(
+                                    "Slash matching is currently {} in {}.",
+                                    enabled,
+                                    msg.channel_login
+                                );
+                                try_respond(
+                                    &client,
+                                    msg.channel_login.as_str(),
+                                    message.as_str(),
+                                    msg.message_id.as_str(),
+                                    limiter.clone(),
+                                )
+                                .await;
                             }
                             "dot" => {
-                                if args.is_empty() {
-                                    let message = format!(
-                                        "Dot matching is currently {} in {}.",
-                                        if chan.dot { "enabled" } else { "not enabled" },
-                                        msg.channel_login
-                                    );
-                                    try_respond(
-                                        &client,
-                                        msg.channel_login.as_str(),
-                                        message.as_str(),
-                                        msg.message_id.as_str(),
-                                        limiter.clone(),
-                                    )
-                                    .await;
-                                } else if let Some(dot) = parse_bool(args).await {
+                                let mut enabled = if chan.dot { "enabled" } else { "not enabled" };
+                                if let Some(dot) = parse_bool(args).await {
                                     let mut chan = chan.clone();
                                     chan.dot = dot;
+                                    enabled = if dot { "enabled" } else { "not enabled" };
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
                                         try_respond(
@@ -345,29 +334,26 @@ async fn handle_command<
                                         ).await;
                                     }
                                 }
+                                let message = format!(
+                                    "Dot matching is currently {} in {}.",
+                                    enabled,
+                                    msg.channel_login
+                                );
+                                try_respond(
+                                    &client,
+                                    msg.channel_login.as_str(),
+                                    message.as_str(),
+                                    msg.message_id.as_str(),
+                                    limiter.clone(),
+                                )
+                                .await;
                             }
                             "subdomains" => {
-                                if args.is_empty() {
-                                    let message = format!(
-                                        "Subdomain matching is currently {} in {}.",
-                                        if chan.subdomains {
-                                            "enabled"
-                                        } else {
-                                            "not enabled"
-                                        },
-                                        msg.channel_login
-                                    );
-                                    try_respond(
-                                        &client,
-                                        msg.channel_login.as_str(),
-                                        message.as_str(),
-                                        msg.message_id.as_str(),
-                                        limiter.clone(),
-                                    )
-                                    .await;
-                                } else if let Some(subdomains) = parse_bool(args).await {
+                                let mut enabled = if chan.subdomains { "enabled" } else { "not enabled" };
+                                if let Some(subdomains) = parse_bool(args).await {
                                     let mut chan = chan.clone();
                                     chan.subdomains = subdomains;
+                                    enabled = if subdomains { "enabled" } else { "not enabled" };
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
                                         try_respond(
@@ -378,24 +364,28 @@ async fn handle_command<
                                             limiter.clone()).await;
                                     }
                                 }
+                                let message = format!(
+                                    "Subdomain matching is currently {} in {}.",
+                                    enabled,
+                                    msg.channel_login
+                                );
+                                try_respond(
+                                    &client,
+                                    msg.channel_login.as_str(),
+                                    message.as_str(),
+                                    msg.message_id.as_str(),
+                                    limiter.clone(),
+                                )
+                                .await;
                             }
                             "role" => {
-                                if args.is_empty() {
-                                    let message = format!(
-                                        "The current allowed user role in {} is {}",
-                                        msg.channel_login, chan.userlevel
-                                    );
-                                    try_respond(
-                                        &client,
-                                        msg.channel_login.as_str(),
-                                        message.as_str(),
-                                        msg.message_id.as_str(),
-                                        limiter.clone(),
-                                    )
-                                    .await;
-                                } else if let Ok(role) = UserRole::from_str(args) {
+                                let mut msg_role = chan.userlevel;
+                                if let Ok(role) =
+                                    UserRole::from_str(args.trim().to_uppercase().as_str())
+                                {
                                     let mut chan = chan.clone();
                                     chan.userlevel = role;
+                                    msg_role = role;
                                     if let Err(e) = db.set_channel(&chan).await {
                                         error!("Error setting channel: {}", e);
                                         try_respond(
@@ -407,6 +397,18 @@ async fn handle_command<
                                         ).await;
                                     }
                                 }
+                                let message = format!(
+                                    "The current allowed user role in {} is {}",
+                                    msg.channel_login, msg_role
+                                );
+                                try_respond(
+                                    &client,
+                                    msg.channel_login.as_str(),
+                                    message.as_str(),
+                                    msg.message_id.as_str(),
+                                    limiter.clone(),
+                                )
+                                .await;
                             }
                             "reply" => {
                                 // If no reply is specified, output the current reply; otherwise, set the reply from args
@@ -783,6 +785,7 @@ pub async fn main() {
                             }
                         } else if message.message_id.is_some()
                             && message.message_id.clone().unwrap() != "delete_message_success"
+                            && message.message_id.clone().unwrap() != "host_on"
                         {
                             info!("Received unknown notice: {:?}", message);
                         }
