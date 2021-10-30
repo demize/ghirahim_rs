@@ -75,7 +75,12 @@ const IGNORE_NOTICES: [&str; 25] = [
 ];
 
 fn get_ghirahim_rs_version() -> String {
-    format!("{}.{}.{}", pkg_version::pkg_version_major!(), pkg_version::pkg_version_minor!(), pkg_version::pkg_version_patch!())
+    format!(
+        "{}.{}.{}",
+        pkg_version::pkg_version_major!(),
+        pkg_version::pkg_version_minor!(),
+        pkg_version::pkg_version_patch!()
+    )
 }
 
 #[instrument(level = "trace")]
@@ -161,7 +166,10 @@ async fn try_send_privmsg<
         .await
         .is_err()
     {
-        if let Err(e) = client.privmsg(channel.to_owned(), msg_contents.to_owned()).await {
+        if let Err(e) = client
+            .privmsg(channel.to_owned(), msg_contents.to_owned())
+            .await
+        {
             warn!("Error sending message: {}", e);
         }
     }
@@ -185,7 +193,10 @@ async fn try_say<
         .await
         .is_err()
     {
-        if let Err(e) = client.say(channel.to_owned(), msg_contents.to_owned()).await {
+        if let Err(e) = client
+            .say(channel.to_owned(), msg_contents.to_owned())
+            .await
+        {
             warn!("Error sending message: {}", e);
         }
     }
@@ -206,12 +217,20 @@ async fn try_respond<
 ) {
     limiter.until_ready().await;
     if client
-        .say_in_response(channel.to_owned(), msg_contents.to_owned(), Some(msg_id.to_owned()))
+        .say_in_response(
+            channel.to_owned(),
+            msg_contents.to_owned(),
+            Some(msg_id.to_owned()),
+        )
         .await
         .is_err()
     {
         if let Err(e) = client
-            .say_in_response(channel.to_owned(), msg_contents.to_owned(), Some(msg_id.to_owned()))
+            .say_in_response(
+                channel.to_owned(),
+                msg_contents.to_owned(),
+                Some(msg_id.to_owned()),
+            )
             .await
         {
             warn!("Error sending message: {}", e);
@@ -296,8 +315,13 @@ async fn handle_command<
                                             limiter.clone(),
                                         ).await;
                                     } else {
-                                        send_channel_list(&client, &privmsg, &chan, limiter.clone())
-                                            .await;
+                                        send_channel_list(
+                                            &client,
+                                            &privmsg,
+                                            &chan,
+                                            limiter.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                             }
@@ -316,8 +340,13 @@ async fn handle_command<
                                             limiter.clone(),
                                         ).await;
                                     } else {
-                                        send_channel_list(&client, &privmsg, &chan, limiter.clone())
-                                            .await;
+                                        send_channel_list(
+                                            &client,
+                                            &privmsg,
+                                            &chan,
+                                            limiter.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                             }
@@ -474,19 +503,28 @@ async fn handle_command<
                                         chan.reply = "default".to_owned();
                                         bot_reply = format!(
                                             "Reply set to: {}",
-                                            generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                            generate_reply(
+                                                &chan.reply,
+                                                privmsg.sender.name.as_str()
+                                            )
                                         );
                                     } else if !args.trim().to_lowercase().contains("__user__") {
                                         chan.reply = format!("{} __user__", args.trim());
                                         bot_reply = format!(
                                             "Reply set to: {}",
-                                            generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                            generate_reply(
+                                                &chan.reply,
+                                                privmsg.sender.name.as_str()
+                                            )
                                         );
                                     } else {
                                         chan.reply = args.trim().to_owned();
                                         bot_reply = format!(
                                             "Reply set to: {}",
-                                            generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                            generate_reply(
+                                                &chan.reply,
+                                                privmsg.sender.name.as_str()
+                                            )
                                         );
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
@@ -636,7 +674,8 @@ async fn handle_command<
                         reply.as_str(),
                         privmsg.message_id.as_str(),
                         limiter.clone(),
-                    ).await;
+                    )
+                    .await;
                 }
                 _ => (),
             }
@@ -646,6 +685,16 @@ async fn handle_command<
 
 #[tokio::main]
 pub async fn main() {
+    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
+    LogTracer::init().expect("Failed to set logger");
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+    set_global_default(subscriber).expect("Failed to set subscriber");
+
     // load in the config
     let config: serde_yaml::Value;
 
@@ -668,6 +717,14 @@ pub async fn main() {
         naive_mode: false,
     };
     let ext = TldExtractor::new(option);
+
+    // Set up metrics if GHIRAHIM_METRICS is set
+    if std::env::var("GHIRAHIM_METRICS").is_ok() {
+        let prometheus_recorder = Box::new(metrics_exporter_prometheus::PrometheusBuilder::new()
+            .build());
+        metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
+        info!("Metrics set up");
+    }
 
     // Set up the IRC config based on the config file
     let login_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
@@ -704,16 +761,6 @@ pub async fn main() {
     channels.insert("ghirahim_bot".to_owned());
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     client.set_wanted_channels(channels);
-
-    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
-    LogTracer::init().expect("Failed to set logger");
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
-    let subscriber = Registry::default()
-        .with(env_filter)
-        .with(JsonStorageLayer)
-        .with(formatting_layer);
-    set_global_default(subscriber).expect("Failed to set subscriber");
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
@@ -784,7 +831,13 @@ pub async fn main() {
                                             "Removed the following regexes from {}: {:?}",
                                             chan.name, bad_regexes
                                         );
-                                        try_say(&client, &message.channel_login, chat_message.as_str(), limiter.clone()).await;
+                                        try_say(
+                                            &client,
+                                            &message.channel_login,
+                                            chat_message.as_str(),
+                                            limiter.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                                 if bad_links.is_some() {

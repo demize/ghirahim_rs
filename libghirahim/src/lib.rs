@@ -340,7 +340,12 @@ mod tests {
 }
 
 pub fn get_libghirahim_version() -> String {
-    format!("{}.{}.{}", pkg_version::pkg_version_major!(), pkg_version::pkg_version_minor!(), pkg_version::pkg_version_patch!())
+    format!(
+        "{}.{}.{}",
+        pkg_version::pkg_version_major!(),
+        pkg_version::pkg_version_minor!(),
+        pkg_version::pkg_version_patch!()
+    )
 }
 
 /// Represents a user's role in chat.
