@@ -711,7 +711,6 @@ pub async fn main() {
         .with(JsonStorageLayer)
         .with(formatting_layer);
     set_global_default(subscriber).expect("Failed to set subscriber");
-    
     // load in the config
     let config: serde_yaml::Value;
 
@@ -757,8 +756,10 @@ pub async fn main() {
             )
             .install()
             .expect("Failed to install metrics");
-        // metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
-        info!("Metrics set up and bound to {}", config["metrics"]["bind_addr"].as_str().unwrap());
+        info!(
+            "Metrics set up and bound to {}",
+            config["metrics"]["bind_addr"].as_str().unwrap()
+        );
     }
 
     // Set up the IRC config based on the config file
