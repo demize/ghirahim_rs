@@ -74,6 +74,10 @@ const IGNORE_NOTICES: [&str; 25] = [
     "unmod_success",
 ];
 
+fn get_ghirahim_rs_version() -> String {
+    format!("{}.{}.{}", pkg_version::pkg_version_major!(), pkg_version::pkg_version_minor!(), pkg_version::pkg_version_patch!())
+}
+
 #[instrument(level = "trace")]
 async fn parse_command(args: &str) -> nom::IResult<&str, &str> {
     alt((
@@ -81,6 +85,7 @@ async fn parse_command(args: &str) -> nom::IResult<&str, &str> {
         tag_no_case("!permit"),
         tag_no_case("!join"),
         tag_no_case("!leave"),
+        tag_no_case("!version"),
     ))(args.trim())
 }
 
@@ -621,6 +626,17 @@ async fn handle_command<
                         )
                         .await;
                     }
+                }
+                "!version" => {
+                    // Reply with the version of the bot and the library
+                    let reply = format!("Ghirahim_Bot, running ghirahim_rs version {} backed by version {} of libghirahim.", get_ghirahim_rs_version(), libghirahim::get_libghirahim_version());
+                    try_respond(
+                        &client,
+                        "ghirahim_bot",
+                        reply.as_str(),
+                        privmsg.message_id.as_str(),
+                        limiter.clone(),
+                    ).await;
                 }
                 _ => (),
             }

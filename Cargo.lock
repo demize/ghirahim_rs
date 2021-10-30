@@ -637,12 +637,13 @@ dependencies = [
 
 [[package]]
 name = "ghirahim_bot"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "governor",
  "libghirahim",
  "nom",
  "nonzero_ext 0.3.0",
+ "pkg-version",
  "serde",
  "serde_yaml",
  "tempfile",
@@ -973,10 +974,11 @@ checksum = "dd8f7255a17a627354f321ef0055d63b898c6fb27eff628af4d1b66b7331edf6"
 
 [[package]]
 name = "libghirahim"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "futures 0.3.17",
  "mongodb",
+ "pkg-version",
  "redis",
  "regex",
  "serde",
@@ -1511,6 +1513,25 @@ name = "pkg-config"
 version = "0.3.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c9b1041b4387893b91ee6746cddfc28516aff326a3519fb2adf820932c5e6cb"
+
+[[package]]
+name = "pkg-version"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e848f61ee4b2010345e65757e427a077213af1cee5d3e6a02e4a151dabca377"
+dependencies = [
+ "pkg-version-impl",
+ "proc-macro-hack",
+]
+
+[[package]]
+name = "pkg-version-impl"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1564bf5d476bf4a5eac420b88c500454c000dca79cef0a2e4304a1fe34361a3b"
+dependencies = [
+ "proc-macro-hack",
+]
 
 [[package]]
 name = "ppv-lite86"
