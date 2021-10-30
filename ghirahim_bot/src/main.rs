@@ -702,6 +702,16 @@ lazy_static! {
 
 #[tokio::main]
 pub async fn main() {
+    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
+    LogTracer::init().expect("Failed to set logger");
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+    set_global_default(subscriber).expect("Failed to set subscriber");
+
     // load in the config
     let config: serde_yaml::Value;
 
@@ -734,6 +744,14 @@ pub async fn main() {
         naive_mode: false,
     };
     let ext = TldExtractor::new(option);
+
+    // Set up metrics if GHIRAHIM_METRICS is set
+    if std::env::var("GHIRAHIM_METRICS").is_ok() {
+        let prometheus_recorder = Box::new(metrics_exporter_prometheus::PrometheusBuilder::new()
+            .build());
+        metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
+        info!("Metrics set up");
+    }
 
     // Set up the IRC config based on the config file
     let login_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
@@ -770,16 +788,6 @@ pub async fn main() {
     channels.insert(logon_name.clone());
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     client.set_wanted_channels(channels);
-
-    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
-    LogTracer::init().expect("Failed to set logger");
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
-    let subscriber = Registry::default()
-        .with(env_filter)
-        .with(JsonStorageLayer)
-        .with(formatting_layer);
-    set_global_default(subscriber).expect("Failed to set subscriber");
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
