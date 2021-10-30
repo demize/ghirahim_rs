@@ -694,7 +694,7 @@ pub async fn main() {
         .with(JsonStorageLayer)
         .with(formatting_layer);
     set_global_default(subscriber).expect("Failed to set subscriber");
-
+    
     // load in the config
     let config: serde_yaml::Value;
 
@@ -720,10 +720,18 @@ pub async fn main() {
 
     // Set up metrics if GHIRAHIM_METRICS is set
     if std::env::var("GHIRAHIM_METRICS").is_ok() {
-        let prometheus_recorder = Box::new(metrics_exporter_prometheus::PrometheusBuilder::new()
-            .build());
-        metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
-        info!("Metrics set up");
+        metrics_exporter_prometheus::PrometheusBuilder::new()
+            .listen_address(
+                config["metrics"]["bind_addr"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<std::net::SocketAddr>()
+                    .unwrap(),
+            )
+            .install()
+            .expect("Failed to install metrics");
+        // metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
+        info!("Metrics set up and bound to {}", config["metrics"]["bind_addr"].as_str().unwrap());
     }
 
     // Set up the IRC config based on the config file
