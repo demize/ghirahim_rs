@@ -28,8 +28,6 @@ Leaving
 
 To have the bot leave your channel, go to its channel and type ``!leave``. It will no longer respond to commands or delete messages in your channel. It should leave immediately, but again, it's possible it could run up against the rate limit; if this is the case, it will leave the next time it receives a message in your channel.
 
-The bot also checks hourly to ensure it's in every channel it should be and not in any it shouldn't be.
-
 Configuring the bot
 ^^^^^^^^^^^^^^^^^^^
 
@@ -70,7 +68,7 @@ The bot has support for two additional features when matching URLs: wildcards an
 
 You can provide a wildcard domain in the format ``*.example.org`` and it will match any subdomains of that domain. Note that this will truly match *any* subdomain, i.e. ``a.b.example.org`` and ``a.example.org`` will both match.
 
-You can also provide a regex to match on. Note that there is a tight timeout on regex execution, and the bot will remove any regexes where the timeout expires (with a message in chat advising you of it). To add a regex, use the format ``/regex/``. 
+You can also provide a regex to match on. Note that there is a tight timeout on regex execution, and the bot will remove any regexes where the timeout expires (with a message in chat advising you of it). To add a regex, use the format ``/regex/``. Regexes will be matched on the full URL, including scheme, so your regexes should keep that in mind; any URL sent in chat without a scheme will have ``http://`` prepended to it due to internal processing.
 
 Using the bot
 ^^^^^^^^^^^^^

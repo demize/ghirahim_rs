@@ -19,7 +19,7 @@ use tokio::time::timeout;
 use twitch_irc::message::Badge;
 use url::Url;
 
-use tracing::instrument;
+use tracing::{info, instrument, warn};
 
 #[cfg(test)]
 mod tests {
@@ -461,7 +461,7 @@ pub async fn extract_urls(
         let link = match Url::from_str(link.as_str()) {
             Ok(url) => url,
             Err(_) => {
-                println!("Couldn't convert {} to URL", link.as_str()); // TODO: log this
+                warn!("Couldn't convert {} to URL", link.as_str());
                 continue;
             }
         };
@@ -484,10 +484,10 @@ pub async fn extract_urls(
                         abort_reg,
                     );
                     // Spawn a task to run the user-supplied regex
-                    let timeout = timeout(Duration::from_millis(10), tokio::spawn(re_future)).await;
+                    let timeout = timeout(Duration::from_millis(25), tokio::spawn(re_future)).await;
                     if timeout.is_err() {
                         // The regex took too long and timed out, abort the task and report the regex
-                        println!("Regex timed out: {}", regex);
+                        info!("Regex timed out: {}", regex);
                         bad_regexes.push(regex.clone());
                         abort_handle.abort();
                         continue;
@@ -505,8 +505,7 @@ pub async fn extract_urls(
                             }
                         }
                         Err(e) => {
-                            // TODO: Logging
-                            println!("Regex failed: {}", e);
+                            info!("Regex failed: {}", e);
                             bad_regexes.push(regex.clone());
                             continue;
                         }
@@ -531,6 +530,7 @@ pub async fn extract_urls(
                 if !channel.allow_list.iter().any(|s| {
                     s.to_lowercase() == host
                         || (channel.subdomains && s.to_lowercase() == tldhost.to_lowercase())
+                        || (s.starts_with("*.") && host.ends_with(&s[2..]))
                 }) {
                     bad_links.push(link.as_str().to_owned());
                 }
