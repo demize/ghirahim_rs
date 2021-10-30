@@ -694,7 +694,6 @@ pub async fn main() {
         .with(JsonStorageLayer)
         .with(formatting_layer);
     set_global_default(subscriber).expect("Failed to set subscriber");
-    
     // load in the config
     let config: serde_yaml::Value;
 
@@ -730,8 +729,10 @@ pub async fn main() {
             )
             .install()
             .expect("Failed to install metrics");
-        // metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
-        info!("Metrics set up and bound to {}", config["metrics"]["bind_addr"].as_str().unwrap());
+        info!(
+            "Metrics set up and bound to {}",
+            config["metrics"]["bind_addr"].as_str().unwrap()
+        );
     }
 
     // Set up the IRC config based on the config file
@@ -739,13 +740,15 @@ pub async fn main() {
     let oauth_token = config["ghirahim"]["password"].as_str().unwrap().to_owned();
     let irc_config = ClientConfig {
         login_credentials: StaticLoginCredentials::new(login_name, Some(oauth_token)),
-        metrics_identifier: Some(Cow::from("Ghirahim_Bot")), // Collect metrics; TODO: actually consume these
+        metrics_identifier: Some(Cow::from("Ghirahim_Bot")), // Collect metrics; these will be exported with the prometheus exporter we set up above
         connection_rate_limiter: Arc::new(Semaphore::new(2)), // Open two connections at once, if necessary
         ..Default::default()
     };
 
     // Set up the rate limiter
-    let limiter = Arc::new(RateLimiter::direct(Quota::per_second(nonzero!(3u32))));
+    // This is set to 200 in 60 seconds, which *will* get us rate limited in the worst case (as long as we're not verified)
+    // But it's useful for metrics, and verification practically requires getting rate limited (thanks, Twitch)
+    let limiter = Arc::new(RateLimiter::direct(Quota::per_minute(nonzero!(200u32))));
 
     // Set up the IRC client
     let (mut incoming_messages, client) =
