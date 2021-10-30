@@ -744,6 +744,14 @@ pub async fn main() {
     };
     let ext = TldExtractor::new(option);
 
+    // Set up metrics if GHIRAHIM_METRICS is set
+    if std::env::var("GHIRAHIM_METRICS").is_ok() {
+        let prometheus_recorder = Box::new(metrics_exporter_prometheus::PrometheusBuilder::new()
+            .build());
+        metrics::set_boxed_recorder(prometheus_recorder).expect("Unable to initialize metrics.");
+        info!("Metrics set up");
+    }
+
     // Set up the IRC config based on the config file
     let login_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
     let oauth_token = config["ghirahim"]["password"].as_str().unwrap().to_owned();

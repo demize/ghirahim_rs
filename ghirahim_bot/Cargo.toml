@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-twitch-irc = { version = "3.1", path = "../../twitch-irc-rs", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
+twitch-irc = { version = "4.0", path = "../../twitch-irc-rs", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
 tokio = { version = "1.12", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
 serde_yaml = "0.8"
