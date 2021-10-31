@@ -1,28 +1,28 @@
 [package]
 name = "ghirahim_bot"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-twitch-irc = { version = "3.0.1", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
-tokio = { version = "1.12.0", features = ["rt", "rt-multi-thread", "macros"] }
+twitch-irc = { version = "3.1", path = "../../twitch-irc-rs", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
+tokio = { version = "1.12", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
-serde_yaml = "0.8.21"
-tldextract = "0.5.1"
-tempfile = "3.2.0"
-tracing = "0.1.29"
-tracing-futures = "0.2.5"
-tracing-subscriber = { version = "0.3.1", features = ["env-filter"] }
-tracing-log = "0.1.2"
-tracing-bunyan-formatter = "0.3.0"
+serde_yaml = "0.8"
+tldextract = "0.5"
+tempfile = "3.2"
+tracing = "0.1"
+tracing-futures = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-log = "0.1"
+tracing-bunyan-formatter = "0.3"
 libghirahim = { path = "../libghirahim" }
-nom = "7.0.0"
-governor = "0.3.2"
-nonzero_ext = "0.3.0"
-pkg-version = "1.0.0"
+nom = "7.0"
+governor = "0.3"
+nonzero_ext = "0.3"
+pkg-version = "1.0"
 lazy_static = "1.4"
-metrics = "0.17.0"
-metrics-exporter-prometheus = { version = "0.6.1", features = ["tokio-exporter"] }
+metrics = "0.17"
+metrics-exporter-prometheus = { version = "0.6", features = ["tokio-exporter"] }
 workspace-hack = { path = "../workspace-hack"}
