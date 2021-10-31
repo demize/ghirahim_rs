@@ -699,11 +699,11 @@ dependencies = [
 
 [[package]]
 name = "ghirahim_bot"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "governor",
  "libghirahim",
- "metrics 0.17.0",
+ "metrics",
  "metrics-exporter-prometheus",
  "nom",
  "nonzero_ext 0.3.0",
@@ -1081,7 +1081,7 @@ checksum = "dd8f7255a17a627354f321ef0055d63b898c6fb27eff628af4d1b66b7331edf6"
 
 [[package]]
 name = "libghirahim"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "futures 0.3.17",
  "mongodb",
@@ -1216,17 +1216,6 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
-dependencies = [
- "metrics-macros",
- "proc-macro-hack",
- "t1ha",
-]
-
-[[package]]
-name = "metrics"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a00f42f354a2ed4894db863b3a4db47aef2d2e4435b937221749bd37a8a7aaa8"
@@ -1244,7 +1233,7 @@ checksum = "343a5ceb38235928e7a5687412590f07e6d281522dcd9ff51246f8856eef5fe5"
 dependencies = [
  "hyper 0.14.14",
  "ipnet",
- "metrics 0.17.0",
+ "metrics",
  "metrics-util",
  "parking_lot 0.11.2",
  "quanta 0.9.3",
@@ -1280,7 +1269,7 @@ dependencies = [
  "dashmap",
  "hashbrown 0.11.2",
  "indexmap",
- "metrics 0.17.0",
+ "metrics",
  "num_cpus",
  "ordered-float",
  "parking_lot 0.11.2",
@@ -2252,18 +2241,18 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strum"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+checksum = "f7ac893c7d471c8a21f31cfe213ec4f6d9afeed25537c772e08ef3f005f8729e"
 dependencies = [
  "strum_macros",
 ]
 
 [[package]]
 name = "strum_macros"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
+checksum = "339f799d8b549e3744c7ac7feb216383e4005d94bdb22561b3ab8f3b808ae9fb"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -2298,18 +2287,6 @@ dependencies = [
  "quote",
  "syn",
  "unicode-xid",
-]
-
-[[package]]
-name = "t1ha"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa44aa51ae1a544e2c35a38831ba54ae40591f21384816f531b84f3e984b9ccc"
-dependencies = [
- "cfg-if 0.1.10",
- "lazy_static",
- "num-traits",
- "rustc_version",
 ]
 
 [[package]]
@@ -2843,9 +2820,7 @@ dependencies = [
 
 [[package]]
 name = "twitch-irc"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e54cf6932e6dbe8f0af0ece6eeaed9a57af1bff66fceedf42cd78dec834b16d6"
+version = "3.1.0"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -2855,7 +2830,7 @@ dependencies = [
  "futures-util",
  "itertools",
  "log",
- "metrics 0.16.0",
+ "metrics",
  "smallvec 1.7.0",
  "thiserror",
  "tokio 1.12.0",
@@ -3127,7 +3102,6 @@ dependencies = [
 name = "workspace-hack"
 version = "0.1.0"
 dependencies = [
- "ahash 0.7.4",
  "either",
  "futures-channel",
  "futures-io",

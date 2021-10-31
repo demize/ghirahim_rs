@@ -717,24 +717,6 @@ pub async fn main() {
     };
     let ext = TldExtractor::new(option);
 
-    // Set up metrics if GHIRAHIM_METRICS is set
-    if std::env::var("GHIRAHIM_METRICS").is_ok() {
-        metrics_exporter_prometheus::PrometheusBuilder::new()
-            .listen_address(
-                config["metrics"]["bind_addr"]
-                    .as_str()
-                    .unwrap()
-                    .parse::<std::net::SocketAddr>()
-                    .unwrap(),
-            )
-            .install()
-            .expect("Failed to install metrics");
-        info!(
-            "Metrics set up and bound to {}",
-            config["metrics"]["bind_addr"].as_str().unwrap()
-        );
-    }
-
     // Set up the IRC config based on the config file
     let login_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
     let oauth_token = config["ghirahim"]["password"].as_str().unwrap().to_owned();
@@ -753,6 +735,24 @@ pub async fn main() {
     // Set up the IRC client
     let (mut incoming_messages, client) =
         TwitchIRCClient::<SecureWSTransport, StaticLoginCredentials>::new(irc_config);
+
+    // Set up metrics if GHIRAHIM_METRICS is set
+    if std::env::var("GHIRAHIM_METRICS").is_ok() {
+        metrics_exporter_prometheus::PrometheusBuilder::new()
+            .listen_address(
+                config["metrics"]["bind_addr"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<std::net::SocketAddr>()
+                    .unwrap(),
+            )
+            .install()
+            .expect("Failed to install metrics");
+        info!(
+            "Metrics set up and bound to {}",
+            config["metrics"]["bind_addr"].as_str().unwrap()
+        );
+    }
 
     // Set up the database connections
     let mongo_str = config["mongo"]["connect_string"].as_str().unwrap();
