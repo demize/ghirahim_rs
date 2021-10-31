@@ -1,4 +1,5 @@
 use governor::{Quota, RateLimiter};
+use lazy_static::lazy_static;
 use libghirahim::{GhirahimDB, UserRole};
 use nonzero_ext::*;
 use std::borrow::Cow;
@@ -75,7 +76,12 @@ const IGNORE_NOTICES: [&str; 25] = [
 ];
 
 fn get_ghirahim_rs_version() -> String {
-    format!("{}.{}.{}", pkg_version::pkg_version_major!(), pkg_version::pkg_version_minor!(), pkg_version::pkg_version_patch!())
+    format!(
+        "{}.{}.{}",
+        pkg_version::pkg_version_major!(),
+        pkg_version::pkg_version_minor!(),
+        pkg_version::pkg_version_patch!()
+    )
 }
 
 #[instrument(level = "trace")]
@@ -161,7 +167,10 @@ async fn try_send_privmsg<
         .await
         .is_err()
     {
-        if let Err(e) = client.privmsg(channel.to_owned(), msg_contents.to_owned()).await {
+        if let Err(e) = client
+            .privmsg(channel.to_owned(), msg_contents.to_owned())
+            .await
+        {
             warn!("Error sending message: {}", e);
         }
     }
@@ -185,7 +194,10 @@ async fn try_say<
         .await
         .is_err()
     {
-        if let Err(e) = client.say(channel.to_owned(), msg_contents.to_owned()).await {
+        if let Err(e) = client
+            .say(channel.to_owned(), msg_contents.to_owned())
+            .await
+        {
             warn!("Error sending message: {}", e);
         }
     }
@@ -206,12 +218,20 @@ async fn try_respond<
 ) {
     limiter.until_ready().await;
     if client
-        .say_in_response(channel.to_owned(), msg_contents.to_owned(), Some(msg_id.to_owned()))
+        .say_in_response(
+            channel.to_owned(),
+            msg_contents.to_owned(),
+            Some(msg_id.to_owned()),
+        )
         .await
         .is_err()
     {
         if let Err(e) = client
-            .say_in_response(channel.to_owned(), msg_contents.to_owned(), Some(msg_id.to_owned()))
+            .say_in_response(
+                channel.to_owned(),
+                msg_contents.to_owned(),
+                Some(msg_id.to_owned()),
+            )
             .await
         {
             warn!("Error sending message: {}", e);
@@ -260,8 +280,13 @@ async fn handle_command<
     ext: &TldExtractor,
     limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
 ) {
+    let logon_name;
+    {
+        let r = BOT_CONFIG.read().unwrap();
+        logon_name = r.logon_name.clone();
+    }
     if let Ok((args, command)) = parse_command(privmsg.message_text.as_str()).await.finish() {
-        if privmsg.channel_login != "ghirahim_bot" {
+        if privmsg.channel_login != logon_name {
             match command {
                 "!links" => {
                     let chan = match db.get_channel(&privmsg.channel_login).await {
@@ -296,8 +321,13 @@ async fn handle_command<
                                             limiter.clone(),
                                         ).await;
                                     } else {
-                                        send_channel_list(&client, &privmsg, &chan, limiter.clone())
-                                            .await;
+                                        send_channel_list(
+                                            &client,
+                                            &privmsg,
+                                            &chan,
+                                            limiter.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                             }
@@ -316,8 +346,13 @@ async fn handle_command<
                                             limiter.clone(),
                                         ).await;
                                     } else {
-                                        send_channel_list(&client, &privmsg, &chan, limiter.clone())
-                                            .await;
+                                        send_channel_list(
+                                            &client,
+                                            &privmsg,
+                                            &chan,
+                                            limiter.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                             }
@@ -474,19 +509,28 @@ async fn handle_command<
                                         chan.reply = "default".to_owned();
                                         bot_reply = format!(
                                             "Reply set to: {}",
-                                            generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                            generate_reply(
+                                                &chan.reply,
+                                                privmsg.sender.name.as_str()
+                                            )
                                         );
                                     } else if !args.trim().to_lowercase().contains("__user__") {
                                         chan.reply = format!("{} __user__", args.trim());
                                         bot_reply = format!(
                                             "Reply set to: {}",
-                                            generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                            generate_reply(
+                                                &chan.reply,
+                                                privmsg.sender.name.as_str()
+                                            )
                                         );
                                     } else {
                                         chan.reply = args.trim().to_owned();
                                         bot_reply = format!(
                                             "Reply set to: {}",
-                                            generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                            generate_reply(
+                                                &chan.reply,
+                                                privmsg.sender.name.as_str()
+                                            )
                                         );
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
@@ -592,7 +636,7 @@ async fn handle_command<
                             );
                             try_respond(
                                 &client,
-                                "ghirahim_bot",
+                                logon_name.as_str(),
                                 "Error joining channel! Please report this error.",
                                 privmsg.message_id.as_str(),
                                 limiter.clone(),
@@ -602,7 +646,7 @@ async fn handle_command<
                             info!("Joined channel {}", &privmsg.sender.login);
                             try_respond(
                                 &client,
-                                "ghirahim_bot",
+                                logon_name.as_str(),
                                 "Joined channel. Remember to set up your settings and allow list!",
                                 privmsg.message_id.as_str(),
                                 limiter.clone(),
@@ -619,7 +663,7 @@ async fn handle_command<
                         db.del_channel(&chan).await;
                         try_respond(
                             &client,
-                            "ghirahim_bot",
+                            logon_name.as_str(),
                             "Left channel.",
                             privmsg.message_id.as_str(),
                             limiter.clone(),
@@ -632,16 +676,28 @@ async fn handle_command<
                     let reply = format!("Ghirahim_Bot, running ghirahim_rs version {} backed by version {} of libghirahim.", get_ghirahim_rs_version(), libghirahim::get_libghirahim_version());
                     try_respond(
                         &client,
-                        "ghirahim_bot",
+                        logon_name.as_str(),
                         reply.as_str(),
                         privmsg.message_id.as_str(),
                         limiter.clone(),
-                    ).await;
+                    )
+                    .await;
                 }
                 _ => (),
             }
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct BotConfig {
+    logon_name: String,
+}
+
+lazy_static! {
+    static ref BOT_CONFIG: std::sync::RwLock<BotConfig> = std::sync::RwLock::new(BotConfig {
+        logon_name: "uninitialized".to_owned()
+    });
 }
 
 #[tokio::main]
@@ -657,6 +713,16 @@ pub async fn main() {
             .read_to_string(&mut config_contents)
             .expect("Unable to read ghirahim.yaml");
         config = serde_yaml::from_str(&config_contents).expect("Unable to parse ghirahim.yaml");
+    }
+
+    let logon_name: String;
+    // Initialize our login name, for use in other functions
+    {
+        let mut w = BOT_CONFIG.write().unwrap();
+        *w = BotConfig {
+            logon_name: config["ghirahim"]["username"].as_str().unwrap().to_owned(),
+        };
+        logon_name = w.logon_name.clone();
     }
 
     // set up the TLD list
@@ -701,7 +767,7 @@ pub async fn main() {
     // Get the list of all the channels we're supposed to be in
     let mut channels = db.get_all_channels().await.unwrap();
     // Insert the bot's own channel
-    channels.insert("ghirahim_bot".to_owned());
+    channels.insert(logon_name.clone());
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     client.set_wanted_channels(channels);
 
@@ -723,9 +789,7 @@ pub async fn main() {
                 ServerMessage::Privmsg(message) => {
                     trace!("Received privmsg: {:?}", message);
                     let user_role = libghirahim::parse_badges(message.badges.clone());
-                    if (user_role >= UserRole::MODERATOR)
-                        || (message.channel_login == "ghirahim_bot")
-                    {
+                    if (user_role >= UserRole::MODERATOR) || (message.channel_login == logon_name) {
                         if let Some(chan) = db.get_channel(&message.channel_login).await {
                             let cooldown_status = db.check_channel_cooldown(&chan).await;
                             if let Err(e) = cooldown_status {
@@ -734,7 +798,7 @@ pub async fn main() {
                                 handle_command(&db, message, client.clone(), &ext, limiter.clone())
                                     .await;
                             }
-                        } else if message.channel_login == "ghirahim_bot" {
+                        } else if message.channel_login == logon_name {
                             handle_command(&db, message, client.clone(), &ext, limiter.clone())
                                 .await;
                         }
@@ -784,7 +848,13 @@ pub async fn main() {
                                             "Removed the following regexes from {}: {:?}",
                                             chan.name, bad_regexes
                                         );
-                                        try_say(&client, &message.channel_login, chat_message.as_str(), limiter.clone()).await;
+                                        try_say(
+                                            &client,
+                                            &message.channel_login,
+                                            chat_message.as_str(),
+                                            limiter.clone(),
+                                        )
+                                        .await;
                                     }
                                 }
                                 if bad_links.is_some() {
