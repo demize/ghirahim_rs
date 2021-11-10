@@ -111,4 +111,4 @@ The executable produced by cargo (target/\*/ghirahim_bot) can be copied out of t
 Getting support
 ---------------
 
-The primary way to get support should be through Github: for bugs or other issues, open an issue; for feature requests, start a discussion. That said, we do have a `discord server <https://discord.gg/dpH4AQD7jz>`_ that you can join for support if necessary. 
+The primary way to get support should be through Github: for bugs or other issues, open an issue; for feature requests, start a discussion. That said, we do have a `discord server <https://discord.gg/dJcNYenwXA>`_ that you can join for support if necessary. 
