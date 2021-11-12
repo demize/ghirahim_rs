@@ -702,6 +702,15 @@ lazy_static! {
 
 #[tokio::main]
 pub async fn main() {
+    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
+    LogTracer::init().expect("Failed to set logger");
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+    set_global_default(subscriber).expect("Failed to set subscriber");
     // load in the config
     let config: serde_yaml::Value;
 
@@ -740,17 +749,37 @@ pub async fn main() {
     let oauth_token = config["ghirahim"]["password"].as_str().unwrap().to_owned();
     let irc_config = ClientConfig {
         login_credentials: StaticLoginCredentials::new(login_name, Some(oauth_token)),
-        metrics_identifier: Some(Cow::from("Ghirahim_Bot")), // Collect metrics; TODO: actually consume these
+        metrics_identifier: Some(Cow::from("Ghirahim_Bot")), // Collect metrics; these will be exported with the prometheus exporter we set up above
         connection_rate_limiter: Arc::new(Semaphore::new(2)), // Open two connections at once, if necessary
         ..Default::default()
     };
 
     // Set up the rate limiter
-    let limiter = Arc::new(RateLimiter::direct(Quota::per_second(nonzero!(3u32))));
+    // This is set to 200 in 60 seconds, which *will* get us rate limited in the worst case (as long as we're not verified)
+    // But it's useful for metrics, and verification practically requires getting rate limited (thanks, Twitch)
+    let limiter = Arc::new(RateLimiter::direct(Quota::per_minute(nonzero!(200u32))));
 
     // Set up the IRC client
     let (mut incoming_messages, client) =
         TwitchIRCClient::<SecureWSTransport, StaticLoginCredentials>::new(irc_config);
+
+    // Set up metrics if GHIRAHIM_METRICS is set
+    if std::env::var("GHIRAHIM_METRICS").is_ok() {
+        metrics_exporter_prometheus::PrometheusBuilder::new()
+            .listen_address(
+                config["metrics"]["bind_addr"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<std::net::SocketAddr>()
+                    .unwrap(),
+            )
+            .install()
+            .expect("Failed to install metrics");
+        info!(
+            "Metrics set up and bound to {}",
+            config["metrics"]["bind_addr"].as_str().unwrap()
+        );
+    }
 
     // Set up the database connections
     let mongo_str = config["mongo"]["connect_string"].as_str().unwrap();
@@ -770,16 +799,6 @@ pub async fn main() {
     channels.insert(logon_name.clone());
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     client.set_wanted_channels(channels);
-
-    // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
-    LogTracer::init().expect("Failed to set logger");
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let formatting_layer = BunyanFormattingLayer::new("ghirahim_bot".into(), std::io::stdout);
-    let subscriber = Registry::default()
-        .with(env_filter)
-        .with(JsonStorageLayer)
-        .with(formatting_layer);
-    set_global_default(subscriber).expect("Failed to set subscriber");
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
