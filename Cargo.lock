@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "ghirahim_bot"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "governor",
  "lazy_static",

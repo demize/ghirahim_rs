@@ -138,14 +138,16 @@ async fn parse_bool(args: &str) -> Option<bool> {
 }
 
 #[instrument(level = "debug")]
-fn generate_reply(reply_str: &str, user: &str) -> String {
+fn generate_reply(reply_str: &str, user: &str) -> Option<String> {
     if reply_str == "default" {
-        format!(
+        Some(format!(
             "@{}, please ask for permission before posting a link.",
             user
-        )
+        ))
+    } else if reply_str == "off" {
+        None
     } else {
-        reply_str.replace("__user__", user)
+        Some(reply_str.replace("__user__", user))
     }
 }
 
@@ -486,11 +488,19 @@ async fn handle_command<
                             "reply" => {
                                 // If no reply is specified, output the current reply; otherwise, set the reply from args
                                 if args.is_empty() {
-                                    let message = format!(
-                                        "Current reply in {}: {}",
-                                        chan.name,
-                                        generate_reply(&chan.reply, privmsg.sender.name.as_str())
-                                    );
+                                    let message;
+                                    message = if let Some(reply) = generate_reply(&chan.reply, privmsg.sender.name.as_str()) {
+                                            format!(
+                                            "Current reply in {}: {}",
+                                            chan.name,
+                                            reply
+                                        )
+                                    } else {
+                                        format!(
+                                            "Replies currently disabled in {}",
+                                            chan.name
+                                        )
+                                    };
                                     try_respond(
                                         &client,
                                         privmsg.channel_login.as_str(),
@@ -512,7 +522,7 @@ async fn handle_command<
                                             generate_reply(
                                                 &chan.reply,
                                                 privmsg.sender.name.as_str()
-                                            )
+                                            ).unwrap()
                                         );
                                     } else if !args.trim().to_lowercase().contains("__user__") {
                                         chan.reply = format!("{} __user__", args.trim());
@@ -521,7 +531,7 @@ async fn handle_command<
                                             generate_reply(
                                                 &chan.reply,
                                                 privmsg.sender.name.as_str()
-                                            )
+                                            ).unwrap()
                                         );
                                     } else {
                                         chan.reply = args.trim().to_owned();
@@ -530,7 +540,7 @@ async fn handle_command<
                                             generate_reply(
                                                 &chan.reply,
                                                 privmsg.sender.name.as_str()
-                                            )
+                                            ).unwrap()
                                         );
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
@@ -890,13 +900,15 @@ pub async fn main() {
                                     )
                                     .await;
                                     let reply = generate_reply(&chan.reply, &message.sender.name);
-                                    try_say(
-                                        &client,
-                                        message.channel_login.as_str(),
-                                        reply.as_str(),
-                                        limiter.clone(),
-                                    )
-                                    .await;
+                                    if let Some(reply) = reply {
+                                            try_say(
+                                            &client,
+                                            message.channel_login.as_str(),
+                                            reply.as_str(),
+                                            limiter.clone(),
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                         }
