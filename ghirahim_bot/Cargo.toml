@@ -1,12 +1,13 @@
 [package]
-name = "ghirahim_bot"
+name    = "ghirahim_bot"
 version = "1.1.1"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-twitch-irc = { version = "4.0", path = "../../twitch-irc-rs", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
+twitch-irc = { version = "4.0", path = "../../twitch-irc-rs", features = [
+    "transport-ws-rustls-webpki-roots",
+    "metrics-collection",
+] }
 tokio = { version = "1.12", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
 serde_yaml = "0.8"
@@ -25,4 +26,4 @@ pkg-version = "1.0"
 lazy_static = "1.4"
 metrics = "0.17"
 metrics-exporter-prometheus = { version = "0.6", features = ["tokio-exporter"] }
-workspace-hack = { path = "../workspace-hack"}
+workspace-hack = { path = "../workspace-hack" }
