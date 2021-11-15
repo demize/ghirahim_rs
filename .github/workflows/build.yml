@@ -25,7 +25,7 @@ jobs:
         ref: 0cdb0d7d94f8991f47b584d6aa1a9ea46b1cee27
         path: twitch-irc-rs
     - name: Build
-      run: cargo build --release --verbose
+      run: cd ghirahim_rs_build && cargo build --release --verbose
     - name: Upload build
       uses: actions/upload-artifact@v2.2.4
       with:
