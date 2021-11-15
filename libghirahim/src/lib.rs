@@ -476,7 +476,8 @@ pub async fn extract_urls(
         };
 
         // Urls that cannot be a base are not Urls you can click on in a Twitch chat
-        if link.cannot_be_a_base() {
+        // Additionally, IP addresses are too prone to false positives and need to be skipped
+        if link.cannot_be_a_base() || link.domain().is_none() {
             continue;
         }
 
