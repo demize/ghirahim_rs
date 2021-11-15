@@ -5,7 +5,7 @@ name: Deploy
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
-  create:
+  push:
     tags: "v*"
 
   # Allows you to run this workflow manually from the Actions tab
@@ -45,10 +45,11 @@ jobs:
           name: ghirahim_bot
           path: /home/runner/temp/ghirahim_bot
       # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Deploy the new binary
         run: |
+          whoami
           sudo systemctl stop ghirahim.service
-          stat /home/runner/temp/ghirahim_bot
-          cp -f /home/runner/temp/ghirahim_bot /home/ghirahim/bin/ghirahim_bot
+          cp -f /home/runner/temp/ghirahim_bot/ghirahim_bot /home/ghirahim/bin/ghirahim_bot
           sudo systemctl start ghirahim.service
-          rm -f /home/runner/temp/ghirahim_bot
+          rm -f /home/runner/temp/ghirahim_bot/ghirahim_bot
+          rmdir /home/runner/temp/ghirahim_bot
