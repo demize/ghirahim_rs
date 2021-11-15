@@ -13,11 +13,30 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        path: ghirahim_rs_build
+    - name: Pull twitch-irc v4.0.0
+      uses: actions/checkout@v2
+      with:
+        repository: robotty/twitch-irc-rs
+        ref: 0cdb0d7d94f8991f47b584d6aa1a9ea46b1cee27
+        path: twitch-irc-rs
+    - name: Build
+      run: cd ghirahim_rs_build && cargo build --release --verbose
+    - name: Upload build
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: ghirahim_bot
+        path: ghirahim_rs_build/target/release/ghirahim_bot
+        if-no-files-found: error
+  deploy:
+    needs: build
     # The type of runner that the job will run on
     runs-on: self-hosted
-
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - name: Download new binary
