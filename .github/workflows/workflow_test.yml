@@ -20,4 +20,5 @@ jobs:
       - name: Run a multi-line script
         run: |
           whoami
+          sudo -S whoami
           echo does it make sense?
