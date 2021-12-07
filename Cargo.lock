@@ -1082,7 +1082,7 @@ checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
 
 [[package]]
 name = "libghirahim"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "futures 0.3.17",
  "mongodb",
