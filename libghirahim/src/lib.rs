@@ -534,6 +534,12 @@ pub async fn extract_urls(
                 || link_had_scheme
                 || (channel.dot && host.matches('.').count() > 1)
             {
+                // If we can't parse out both the domain and suffix, then the link is probably not a real link
+                if tld.domain.is_none() || tld.suffix.is_none() {
+                    warn!("Couldn't parse domain or suffix from message: {:?}", message);
+                    continue;
+                }
+
                 // tldhost is used for subdomain matching; it gets the TLD, plus the base domain
                 let tldhost = tld.domain.unwrap() + "." + &tld.suffix.unwrap();
                 // If there are no matches between the allow list and the domain, the link is bad
@@ -714,6 +720,11 @@ impl GhirahimDB {
     /// Issues a permit for the specified user in the specified channel.
     #[instrument(level = "debug")]
     pub async fn issue_permit(&self, chan: &Channel, user: &str) -> redis::RedisResult<()> {
+        let user = if let Some(stripped) = user.strip_prefix('@') {
+            stripped
+        } else {
+            user
+        };
         let key = format!("permit:{}:{}", chan.name, user);
         let _: () = self.redis_client.clone().set_ex(key, true, 300).await?;
         Ok(())
@@ -722,11 +733,6 @@ impl GhirahimDB {
     /// Checks whether the specified user has a permit in the specified channel.
     #[instrument(level = "debug")]
     pub async fn check_permit(&self, chan: &Channel, user: &str) -> redis::RedisResult<bool> {
-        let user = if let Some(stripped) = user.strip_prefix('@') {
-            stripped
-        } else {
-            user
-        };
         let key = format!("permit:{}:{}", chan.name, user);
         let permitted = self.redis_client.clone().get::<String, bool>(key).await;
         match permitted {
