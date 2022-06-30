@@ -488,18 +488,12 @@ async fn handle_command<
                             "reply" => {
                                 // If no reply is specified, output the current reply; otherwise, set the reply from args
                                 if args.is_empty() {
-                                    let message;
-                                    message = if let Some(reply) = generate_reply(&chan.reply, privmsg.sender.name.as_str()) {
-                                            format!(
-                                            "Current reply in {}: {}",
-                                            chan.name,
-                                            reply
-                                        )
+                                    let message = if let Some(reply) =
+                                        generate_reply(&chan.reply, privmsg.sender.name.as_str())
+                                    {
+                                        format!("Current reply in {}: {}", chan.name, reply)
                                     } else {
-                                        format!(
-                                            "Replies currently disabled in {}",
-                                            chan.name
-                                        )
+                                        format!("Replies currently disabled in {}", chan.name)
                                     };
                                     try_respond(
                                         &client,
@@ -522,7 +516,8 @@ async fn handle_command<
                                             generate_reply(
                                                 &chan.reply,
                                                 privmsg.sender.name.as_str()
-                                            ).unwrap()
+                                            )
+                                            .unwrap()
                                         );
                                     } else if !args.trim().to_lowercase().contains("__user__") {
                                         chan.reply = format!("{} __user__", args.trim());
@@ -531,7 +526,8 @@ async fn handle_command<
                                             generate_reply(
                                                 &chan.reply,
                                                 privmsg.sender.name.as_str()
-                                            ).unwrap()
+                                            )
+                                            .unwrap()
                                         );
                                     } else {
                                         chan.reply = args.trim().to_owned();
@@ -540,7 +536,8 @@ async fn handle_command<
                                             generate_reply(
                                                 &chan.reply,
                                                 privmsg.sender.name.as_str()
-                                            ).unwrap()
+                                            )
+                                            .unwrap()
                                         );
                                     }
                                     if let Err(e) = db.set_channel(&chan).await {
@@ -630,7 +627,18 @@ async fn handle_command<
             match command {
                 "!join" => {
                     // Join the channel of the user who sent the message
-                    client.join(privmsg.sender.login.clone());
+                    if let Err(e) = client.join(privmsg.sender.login.clone()) {
+                        error!("IRC error joining channel {}: {}", &privmsg.sender.login, e);
+                        try_respond(
+                            &client,
+                            logon_name.as_str(),
+                            "Error joining channel! Please report this error.",
+                            privmsg.message_id.as_str(),
+                            limiter.clone(),
+                        )
+                        .await;
+                        return;
+                    }
                     // Don't bother adding the channel to the database if it's already there
                     if db.get_channel(&privmsg.sender.login).await.is_none() {
                         if let Err(e) = db
@@ -808,7 +816,8 @@ pub async fn main() {
     // Insert the bot's own channel
     channels.insert(logon_name.clone());
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
-    client.set_wanted_channels(channels);
+    // If this fails, we want to panic; the bot doesn't work if it can't join any channels
+    client.set_wanted_channels(channels).unwrap();
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
@@ -901,7 +910,7 @@ pub async fn main() {
                                     .await;
                                     let reply = generate_reply(&chan.reply, &message.sender.name);
                                     if let Some(reply) = reply {
-                                            try_say(
+                                        try_say(
                                             &client,
                                             message.channel_login.as_str(),
                                             reply.as_str(),

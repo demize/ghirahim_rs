@@ -4,10 +4,7 @@ version = "1.1.1"
 edition = "2018"
 
 [dependencies]
-twitch-irc = { version = "4.0", path = "../../twitch-irc-rs", features = [
-    "transport-ws-rustls-webpki-roots",
-    "metrics-collection",
-] }
+twitch-irc = { version = "4.0", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
 tokio = { version = "1.12", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
 serde_yaml = "0.8"
@@ -15,7 +12,7 @@ tldextract = "0.5"
 tempfile = "3.2"
 tracing = "0.1"
 tracing-futures = "0.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "=0.3.11", features = ["env-filter"] }
 tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
 libghirahim = { path = "../libghirahim" }
