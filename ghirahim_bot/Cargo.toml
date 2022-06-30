@@ -12,7 +12,7 @@ tldextract = "0.5"
 tempfile = "3.2"
 tracing = "0.1"
 tracing-futures = "0.2"
-tracing-subscriber = { version = "=0.3.11", features = ["env-filter"] }
+tracing-subscriber = { version = "=0.3.12", features = ["env-filter"] }
 tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
 libghirahim = { path = "../libghirahim" }
