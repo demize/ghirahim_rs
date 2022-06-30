@@ -161,7 +161,7 @@ async fn try_send_privmsg<
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg_contents: &str,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
 ) {
     limiter.until_ready().await;
     if client
@@ -188,7 +188,7 @@ async fn try_say<
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg_contents: &str,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
 ) {
     limiter.until_ready().await;
     if client
@@ -216,7 +216,7 @@ async fn try_respond<
     channel: &str,
     msg_contents: &str,
     msg_id: &str,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
 ) {
     limiter.until_ready().await;
     if client
@@ -251,7 +251,7 @@ async fn send_channel_list<
     client: &TwitchIRCClient<T, L>,
     message: &PrivmsgMessage,
     chan: &libghirahim::Channel,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
 ) {
     // Print the list of allowed links in the channel
     let reply = format!(
@@ -280,7 +280,7 @@ async fn handle_command<
     privmsg: PrivmsgMessage,
     client: TwitchIRCClient<T, L>,
     ext: &TldExtractor,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C>>,
+    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
 ) {
     let logon_name;
     {
