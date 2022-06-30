@@ -692,7 +692,7 @@ dependencies = [
  "governor",
  "lazy_static",
  "libghirahim",
- "metrics 0.17.1",
+ "metrics 0.18.1",
  "metrics-exporter-prometheus",
  "nom",
  "nonzero_ext 0.3.0",
