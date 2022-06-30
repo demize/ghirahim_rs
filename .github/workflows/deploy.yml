@@ -19,12 +19,6 @@ jobs:
     - uses: actions/checkout@v2
       with:
         path: ghirahim_rs_build
-    - name: Pull twitch-irc v4.0.0
-      uses: actions/checkout@v2
-      with:
-        repository: robotty/twitch-irc-rs
-        ref: 0cdb0d7d94f8991f47b584d6aa1a9ea46b1cee27
-        path: twitch-irc-rs
     - name: Build
       run: cd ghirahim_rs_build && cargo build --release --verbose
     - name: Upload build

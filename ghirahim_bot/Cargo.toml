@@ -21,6 +21,6 @@ governor = "0.4"
 nonzero_ext = "0.3"
 pkg-version = "1.0"
 lazy_static = "1.4"
-metrics = "0.17"
-metrics-exporter-prometheus = { version = "0.6", features = ["tokio-exporter"] }
+metrics = "0.18"
+metrics-exporter-prometheus = { version = "0.7", features = ["tokio-exporter"] }
 workspace-hack = { path = "../workspace-hack" }
