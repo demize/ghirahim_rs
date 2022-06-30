@@ -17,7 +17,7 @@ tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
 libghirahim = { path = "../libghirahim" }
 nom = "7.0"
-governor = "0.3"
+governor = "0.4"
 nonzero_ext = "0.3"
 pkg-version = "1.0"
 lazy_static = "1.4"
