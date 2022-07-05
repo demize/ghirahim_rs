@@ -14,7 +14,7 @@ tokio = { version = "1.12.0", features = [
     "macros",
     "time",
 ] }
-regex = "1.5.4"
+regex = "1.6.0"
 futures = "0.3.17"
 workspace-hack = { path = "../workspace-hack" }
 mongodb = "2.0.0"
