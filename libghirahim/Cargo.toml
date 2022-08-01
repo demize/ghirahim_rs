@@ -8,7 +8,7 @@ strum = { version = "0.24", features = ["derive"] }
 twitch-irc = { version = "4.0" }
 tldextract = "0.5.1"
 url = "2.2.2"
-tokio = { version = "1.12.0", features = [
+tokio = { version = "1.20.1", features = [
     "rt",
     "rt-multi-thread",
     "macros",
