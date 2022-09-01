@@ -6,7 +6,7 @@ edition = "2018"
 [dependencies]
 strum = { version = "0.24", features = ["derive"] }
 twitch-irc = { version = "4.0" }
-tldextract = "0.5.1"
+tldextract = "0.6.0"
 url = "2.2.2"
 tokio = { version = "1.20.1", features = [
     "rt",
