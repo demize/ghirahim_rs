@@ -39,12 +39,11 @@ mod tests {
     async fn test_with_slash() {
         // Set up the TldExtractor and a channel
         let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-        let option = TldOption {
-            cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"),
-            private_domains: false,
-            update_local: true,
-            naive_mode: false,
-        };
+        let option = TldOption::default()
+            .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"))
+            .private_domains(false)
+            .update_local(true)
+            .naive_mode(false);
         let ext = TldExtractor::new(option);
         let chan = Channel {
             name: "n/a".to_owned(),
@@ -79,12 +78,11 @@ mod tests {
     #[test]
     async fn test_with_dot() {
         let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-        let option = TldOption {
-            cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"),
-            private_domains: false,
-            update_local: true,
-            naive_mode: false,
-        };
+        let option = TldOption::default()
+            .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"))
+            .private_domains(false)
+            .update_local(true)
+            .naive_mode(false);
         let ext = TldExtractor::new(option);
         let chan = Channel {
             name: "n/a".to_owned(),
@@ -119,12 +117,11 @@ mod tests {
     #[test]
     async fn test_with_subdomains() {
         let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-        let option = TldOption {
-            cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"),
-            private_domains: false,
-            update_local: true,
-            naive_mode: false,
-        };
+        let option = TldOption::default()
+            .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"))
+            .private_domains(false)
+            .update_local(true)
+            .naive_mode(false);
         let ext = TldExtractor::new(option);
         // This channel needs an allow list to test the subdomains functionality properly
         let chan = Channel {
@@ -153,12 +150,11 @@ mod tests {
     #[test]
     async fn test_with_regex() {
         let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-        let option = TldOption {
-            cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"),
-            private_domains: false,
-            update_local: true,
-            naive_mode: false,
-        };
+        let option = TldOption::default()
+            .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"))
+            .private_domains(false)
+            .update_local(true)
+            .naive_mode(false);
         let ext = TldExtractor::new(option);
         // The allow list here needs to have some regular expressions. The first one is to test
         // with our standard messages, but the second one is more realistic, so makes for an appropriate test case.
@@ -196,12 +192,11 @@ mod tests {
     #[test]
     async fn test_with_none() {
         let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-        let option = TldOption {
-            cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"),
-            private_domains: false,
-            update_local: true,
-            naive_mode: false,
-        };
+        let option = TldOption::default()
+            .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"))
+            .private_domains(false)
+            .update_local(true)
+            .naive_mode(false);
         let ext = TldExtractor::new(option);
         let chan = Channel {
             name: "n/a".to_owned(),
@@ -239,12 +234,11 @@ mod tests {
     #[test]
     async fn test_multiple_links() {
         let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-        let option = TldOption {
-            cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"),
-            private_domains: false,
-            update_local: true,
-            naive_mode: false,
-        };
+        let option = TldOption::default()
+            .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + "/.tldcache"))
+            .private_domains(false)
+            .update_local(true)
+            .naive_mode(false);
         let ext = TldExtractor::new(option);
         let chan = Channel {
             name: "n/a".to_owned(),

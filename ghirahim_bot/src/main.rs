@@ -754,12 +754,11 @@ pub async fn main() {
 
     // set up the TLD list
     let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-    let option = TldOption {
-        cache_path: Some(temp_folder.path().to_str().unwrap().to_owned() + ".tldcache"),
-        private_domains: false,
-        update_local: true,
-        naive_mode: false,
-    };
+    let option = TldOption::default() 
+        .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + ".tldcache"))
+        .private_domains(false)
+        .update_local(true)
+        .naive_mode(false);
     let ext = TldExtractor::new(option);
 
     // Set up the IRC config based on the config file

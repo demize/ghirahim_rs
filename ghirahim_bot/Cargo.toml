@@ -1,6 +1,6 @@
 [package]
 name    = "ghirahim_bot"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2018"
 
 [dependencies]
@@ -8,7 +8,7 @@ twitch-irc = { version = "4.0", features = ["transport-ws-rustls-webpki-roots", 
 tokio = { version = "1.20", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
 serde_yaml = "0.9"
-tldextract = "0.5"
+tldextract = "0.6.0"
 tempfile = "3.2"
 tracing = "0.1"
 tracing-futures = "0.2"
