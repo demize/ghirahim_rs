@@ -783,7 +783,7 @@ pub async fn main() {
     // Set up metrics if GHIRAHIM_METRICS is set
     if std::env::var("GHIRAHIM_METRICS").is_ok() {
         metrics_exporter_prometheus::PrometheusBuilder::new()
-            .listen_address(
+            .with_http_listener(
                 config["metrics"]["bind_addr"]
                     .as_str()
                     .unwrap()

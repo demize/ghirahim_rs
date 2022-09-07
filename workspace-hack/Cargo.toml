@@ -19,7 +19,6 @@ futures-channel = { version = "0.3", features = ["alloc", "futures-sink", "sink"
 futures-util = { version = "0.3", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2", features = ["std", "use_std"] }
-num-traits = { version = "0.2", default-features = false, features = ["std"] }
 rand = { version = "0.8", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 rustls = { version = "0.20", features = ["dangerous_configuration", "log", "logging", "tls12"] }
 tokio = { version = "1", features = ["bytes", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "rt", "rt-multi-thread", "socket2", "sync", "time", "tokio-macros"] }
@@ -28,8 +27,5 @@ tokio-util = { version = "0.7", features = ["codec", "io", "tracing"] }
 tracing = { version = "0.1", features = ["attributes", "log", "std", "tracing-attributes"] }
 tracing-core = { version = "0.1", features = ["lazy_static", "std"] }
 twitch-irc = { version = "4", features = ["async-tungstenite", "bytes", "metrics", "metrics-collection", "tokio-native-tls", "tokio-stream", "tokio-util", "transport-tcp", "transport-tcp-native-tls", "transport-ws", "transport-ws-rustls-webpki-roots"] }
-
-[build-dependencies]
-memchr = { version = "2", features = ["std", "use_std"] }
 
 ### END HAKARI SECTION
