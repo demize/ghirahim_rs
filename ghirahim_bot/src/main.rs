@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tldextract::{TldExtractor, TldOption};
 use tokio::sync::Semaphore;
 use twitch_irc::login::StaticLoginCredentials;
@@ -16,6 +17,8 @@ use twitch_irc::SecureWSTransport;
 use twitch_irc::TwitchIRCClient;
 
 use nom::{branch::alt, bytes::complete::tag_no_case, Finish};
+
+use serde_json;
 
 use tracing::{debug, error, info, instrument, subscriber::set_global_default, trace, warn};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -161,7 +164,14 @@ async fn try_send_privmsg<
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg_contents: &str,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
+    limiter: Arc<
+        RateLimiter<
+            governor::state::NotKeyed,
+            S,
+            C,
+            governor::middleware::NoOpMiddleware<C::Instant>,
+        >,
+    >,
 ) {
     limiter.until_ready().await;
     if client
@@ -188,7 +198,14 @@ async fn try_say<
     client: &TwitchIRCClient<T, L>,
     channel: &str,
     msg_contents: &str,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
+    limiter: Arc<
+        RateLimiter<
+            governor::state::NotKeyed,
+            S,
+            C,
+            governor::middleware::NoOpMiddleware<C::Instant>,
+        >,
+    >,
 ) {
     limiter.until_ready().await;
     if client
@@ -216,7 +233,14 @@ async fn try_respond<
     channel: &str,
     msg_contents: &str,
     msg_id: &str,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
+    limiter: Arc<
+        RateLimiter<
+            governor::state::NotKeyed,
+            S,
+            C,
+            governor::middleware::NoOpMiddleware<C::Instant>,
+        >,
+    >,
 ) {
     limiter.until_ready().await;
     if client
@@ -251,7 +275,14 @@ async fn send_channel_list<
     client: &TwitchIRCClient<T, L>,
     message: &PrivmsgMessage,
     chan: &libghirahim::Channel,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
+    limiter: Arc<
+        RateLimiter<
+            governor::state::NotKeyed,
+            S,
+            C,
+            governor::middleware::NoOpMiddleware<C::Instant>,
+        >,
+    >,
 ) {
     // Print the list of allowed links in the channel
     let reply = format!(
@@ -280,7 +311,14 @@ async fn handle_command<
     privmsg: PrivmsgMessage,
     client: TwitchIRCClient<T, L>,
     ext: &TldExtractor,
-    limiter: Arc<RateLimiter<governor::state::NotKeyed, S, C, governor::middleware::NoOpMiddleware<C::Instant>>>,
+    limiter: Arc<
+        RateLimiter<
+            governor::state::NotKeyed,
+            S,
+            C,
+            governor::middleware::NoOpMiddleware<C::Instant>,
+        >,
+    >,
 ) {
     let logon_name;
     {
@@ -710,11 +748,17 @@ async fn handle_command<
 #[derive(Debug, Clone)]
 struct BotConfig {
     logon_name: String,
+    moderator_id: String,
+    client_id: String,
+    token: String,
 }
 
 lazy_static! {
     static ref BOT_CONFIG: std::sync::RwLock<BotConfig> = std::sync::RwLock::new(BotConfig {
-        logon_name: "uninitialized".to_owned()
+        logon_name: "uninitialized".to_owned(),
+        moderator_id: "uninitialized".to_owned(),
+        client_id: "uninitialized".to_owned(),
+        token: "uninitialized".to_owned(),
     });
 }
 
@@ -743,18 +787,22 @@ pub async fn main() {
     }
 
     let logon_name: String;
-    // Initialize our login name, for use in other functions
+    let client_id: String;
+    let oauth_token: String;
+    // Initialize our login name and client ID, for use in other functions
     {
         let mut w = BOT_CONFIG.write().unwrap();
-        *w = BotConfig {
-            logon_name: config["ghirahim"]["username"].as_str().unwrap().to_owned(),
-        };
+        w.logon_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
+        w.client_id = config["ghirahim"]["client_id"].as_str().unwrap().to_owned();
+        w.token = config["ghirahim"]["password"].as_str().unwrap().to_owned();
         logon_name = w.logon_name.clone();
+        client_id = w.client_id.clone();
+        oauth_token = w.token.clone();
     }
 
     // set up the TLD list
     let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
-    let option = TldOption::default() 
+    let option = TldOption::default()
         .cache_path(&(temp_folder.path().to_str().unwrap().to_owned() + ".tldcache"))
         .private_domains(false)
         .update_local(true)
@@ -763,9 +811,8 @@ pub async fn main() {
 
     // Set up the IRC config based on the config file
     let login_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
-    let oauth_token = config["ghirahim"]["password"].as_str().unwrap().to_owned();
     let irc_config = ClientConfig {
-        login_credentials: StaticLoginCredentials::new(login_name, Some(oauth_token)),
+        login_credentials: StaticLoginCredentials::new(login_name, Some(oauth_token.clone())),
         metrics_identifier: Some(Cow::from("Ghirahim_Bot")), // Collect metrics; these will be exported with the prometheus exporter we set up above
         connection_rate_limiter: Arc::new(Semaphore::new(2)), // Open two connections at once, if necessary
         ..Default::default()
@@ -817,6 +864,54 @@ pub async fn main() {
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     // If this fails, we want to panic; the bot doesn't work if it can't join any channels
     client.set_wanted_channels(channels).unwrap();
+
+    // Get our user ID from helix; also serves as a check to make sure the client ID is correct
+    // Limit the scope here so we don't keep too many unnecessary variables around
+    let rest_client;
+    let moderator_id: String;
+    {
+        let mut w = BOT_CONFIG.write().unwrap();
+
+        // Set up headers
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(reqwest::header::USER_AGENT, format!("Ghirahim_Bot/{}", get_ghirahim_rs_version()).parse().unwrap());
+        headers.insert::<reqwest::header::HeaderName>(
+            "Client-Id".parse().unwrap(),
+            client_id.parse().unwrap(),
+        );
+
+        // Set up the client
+        let temp_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+        rest_client = tower::ServiceBuilder::new()
+            .rate_limit(600, Duration::from_secs(60))
+            .service(temp_client);
+
+        // Set up the params
+        let params = vec![("login", logon_name.clone())];
+
+        // Get the response
+        let resp = rest_client
+            .get_ref()
+            .get("https://api.twitch.tv/helix/users")
+            .query(&params)
+            .bearer_auth(&oauth_token)
+            .send()
+            .await
+            .unwrap();
+
+        if !resp.status().is_success() {
+            panic!("Could not get moderator ID! {}", &resp.text().await.unwrap());
+        }
+
+        let json_resp: serde_json::Value =
+            serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+
+        w.moderator_id = json_resp["data"][0]["id"].as_str().unwrap().to_string();
+        moderator_id = w.moderator_id.clone();
+    }
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
@@ -900,13 +995,28 @@ pub async fn main() {
                                         &message.channel_login,
                                         &message.message_id
                                     );
-                                    try_send_privmsg(
-                                        &client,
-                                        message.channel_login.as_str(),
-                                        format!("/delete {}", message.message_id).as_str(),
-                                        limiter.clone(),
-                                    )
-                                    .await;
+                                    
+                                    // Delete the message through Helix
+                                    let params = vec![("broadcaster_id", &message.channel_id),
+                                                                            ("moderator_id", &moderator_id),
+                                                                            ("message_id", &message.message_id)];
+                                    let resp = rest_client
+                                        .get_ref()
+                                        .delete("https://api.twitch.tv/helix/moderation/chat")
+                                        .query(&params)
+                                        .bearer_auth(&oauth_token)
+                                        .send()
+                                        .await
+                                        .unwrap();
+
+                                    debug!("Sent request: {:#?}", resp);
+
+                                    if resp.status().is_client_error() {
+                                        error!("Client error while deleting message: {:?} ({})", resp.status(), resp.text().await.unwrap());
+                                    } else if resp.status().is_server_error() {
+                                        warn!("Server error while deleting message: {:?} ({})", resp.status(), resp.text().await.unwrap());
+                                    }
+
                                     let reply = generate_reply(&chan.reply, &message.sender.name);
                                     if let Some(reply) = reply {
                                         try_say(
