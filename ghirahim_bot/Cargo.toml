@@ -1,6 +1,6 @@
 [package]
 name    = "ghirahim_bot"
-version = "1.1.3"
+version = "2.0.0"
 edition = "2018"
 
 [dependencies]
@@ -8,6 +8,7 @@ twitch-irc = { version = "4.0", features = ["transport-ws-rustls-webpki-roots", 
 tokio = { version = "1.20", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
 serde_yaml = "0.9"
+serde_json = "1.0"
 tldextract = "0.6.0"
 tempfile = "3.2"
 tracing = "0.1"
@@ -23,4 +24,6 @@ pkg-version = "1.0"
 lazy_static = "1.4"
 metrics = "0.18"
 metrics-exporter-prometheus = { version = "0.9.0", features = ["http-listener"] }
+reqwest = { version = "0.11", features = ["json"] }
+tower = { version = "0.4", features = ["limit"] }
 workspace-hack = { path = "../workspace-hack" }
