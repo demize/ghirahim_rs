@@ -87,12 +87,19 @@ Limitations
 Running the bot yourself
 ------------------------
 
-Ghirahim_Bot is not designed to be a self-bot, and currently does not have built-in support for specifying its own channel; to run it yourself, you will need to modify the source. That said, you can run it yourself so long as you have a bot account, a mongodb server, and a redis server. Just copy ``ghirahim.yaml.sample`` to ``ghirahim.yaml``, make the necessary edits, build the bot, and run it. 
-
 Prerequisites 
 ^^^^^^^^^^^^^
 
-This bot was built and tested with Rust 1.56.0. It requires its own Twitch account, a MongoDB server, and a Redis server. Redis is not optional; it's built in to the bot logic, and the ``!permit`` command is implemented entirely with Redis. The following packages are also required (exact packages may vary based on your OS and package manager):
+You'll need the following to run Ghirahim_Bot yourself:
+
+- A Twitch account, preferably (but not necessarily) a dedicated one
+- A registered Twitch application, with a client ID
+- An OAuth token for your registered application, with at minimum the ``chat:read``, ``chat:edit``, and ``moderator:manage:chat_messages`` scopes, created by your bot account
+    - You can generate this by authorizing your application with the following URL from your bot account: ``https://id.twitch.tv/oauth2/authorize?response_type=token&scope=chat%3Aread+chat%3Aedit+moderator%3Amanage%3Achat_messages&client_id=[YOUR CLIENT ID]&redirect_uri=[YOUR REDIRECT URI]``. The redirect URI can be anything; it doesn't really matter in this context, so long as you can copy the token from the resulting URL.
+- A redis server
+- A mongodb server
+
+The following packages are also required (exact packages may vary based on your OS and package manager):
 
 - C compiler/linker/ar (just install build-essential on Ubuntu/Debian)
 - libssl-dev
@@ -101,12 +108,14 @@ This bot was built and tested with Rust 1.56.0. It requires its own Twitch accou
 Setup
 ^^^^^
 
-All config is kept in ``girahim.yaml``. Copy ``ghirahim.yaml.sample`` to ``ghirahim.yaml`` and edit the settings. You need an oauth password for the account you intend to use; the easiest option is to generate one with `twitchapps <https://twitchapps.com/tmi/>`_. Ensure it follows the format ``oauth:your_oauth_token`` (including the ``oauth:`` prefix) or the bot will be unable to log in. You'll also need to provide a MongoDB server and Redis server, with credentials in the formats specified.
+All config is kept in ``girahim.yaml``. Copy ``ghirahim.yaml.sample`` to ``ghirahim.yaml`` and edit the settings. Ensure that you specify an OAuth token matching your client ID, and that it's specified as in the sample file (that is, with no ``oauth:`` prefix).
+
+Once the config is set up, you can build the bot with ``cargo build`` or ``cargo build --release``. There are some test cases that you can run with ``cargo test`` as well.
 
 Running the bot
 ^^^^^^^^^^^^^^^
 
-The executable produced by cargo (target/\*/ghirahim_bot) can be copied out of the target directory and run directly. Running the bot under its own account is recommended. It can be easily run as a service with a basic systemd unit file; it does not fork, so it should be run with exec, and it will print all log messages to stdout to be caught and logged by systemd. You should probably build it with the ``--release`` flag for optimizations, especially if running it on a relatively low-powered server.
+The executable produced by cargo (target/\*/ghirahim_bot) can be copied out of the target directory and run directly. Running the bot under its own account is recommended. It can be easily run as a service with a basic systemd unit file; it does not fork, so it should be run with exec, and it will print all log messages to stdout to be caught and logged by systemd.
 
 Getting support
 ---------------

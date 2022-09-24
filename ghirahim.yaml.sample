@@ -1,0 +1,15 @@
+ghirahim:
+  username: ghirahim_bot
+  password: oauth-token
+  client_id: client-id
+  log:
+    logdir: /var/log/ghirahim
+    console: true
+mongo:
+  connect_string: mongodb+srv://user:pass@db-server/db-name
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+metrics:
+  bind_addr: host:port
