@@ -23,7 +23,7 @@ nonzero_ext = "0.3"
 pkg-version = "1.0"
 lazy_static = "1.4"
 metrics = "0.18"
-metrics-exporter-prometheus = { version = "0.9.0", features = ["http-listener"] }
+metrics-exporter-prometheus = { version = "0.11.0", features = ["http-listener"] }
 reqwest = { version = "0.11", features = ["json"] }
 tower = { version = "0.4", features = ["limit"] }
 workspace-hack = { path = "../workspace-hack" }
