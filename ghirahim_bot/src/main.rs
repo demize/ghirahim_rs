@@ -889,8 +889,35 @@ pub async fn main() {
             .rate_limit(600, Duration::from_secs(60))
             .service(temp_client);
 
+        // Get our ID and login by validating our token
+        let resp = rest_client
+            .get_ref()
+            .get("https://id.twitch.tv/oauth2/validate")
+            .bearer_auth(&oauth_token)
+            .send()
+            .await
+            .unwrap();
+
+        if !resp.status().is_success() {
+            panic!("Could not get validate token! {}", &resp.text().await.unwrap());
+        }
+
+        let json_resp: serde_json::Value =
+            serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+        
+        if !json_resp["scopes"].as_array().unwrap().iter().any(|s| s == "chat:edit" || s == "chat:moderate" || s == "moderator:manage:chat_messages") {
+            panic!("Token is missing necessary scopes. Scopes are {} but should include [\"chat:edit\", \"chat:read\", \"moderator:manage:chat_messages\"]", json_resp["scopes"]);
+        }
+
+        if json_resp["client_id"] != client_id {
+            panic!("Token is issued for the wrong client ID");
+        }
+
+        w.moderator_id = json_resp["user_id"].as_str().unwrap().to_string();
+        moderator_id = w.moderator_id.clone();
+
         // Set up the params
-        let params = vec![("login", logon_name.clone())];
+        let params = vec![("user_id", moderator_id.clone())];
 
         // Get the response
         let resp = rest_client
@@ -903,14 +930,8 @@ pub async fn main() {
             .unwrap();
 
         if !resp.status().is_success() {
-            panic!("Could not get moderator ID! {}", &resp.text().await.unwrap());
+            panic!("Helix check failed! {}", &resp.text().await.unwrap());
         }
-
-        let json_resp: serde_json::Value =
-            serde_json::from_str(&resp.text().await.unwrap()).unwrap();
-
-        w.moderator_id = json_resp["data"][0]["id"].as_str().unwrap().to_string();
-        moderator_id = w.moderator_id.clone();
     }
 
     // Set up the actual event loop
