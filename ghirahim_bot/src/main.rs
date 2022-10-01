@@ -1011,7 +1011,17 @@ pub async fn main() {
 
                                     debug!("Sent request: {:#?}", resp);
 
-                                    if resp.status().is_client_error() {
+                                    if resp.status().as_u16() == 403 {
+                                        error!("Received 403 for {} while trying to delete message", message.channel_login);
+                                        if let Some(chan) = db.get_channel(&message.channel_login).await {
+                                            if let Err(e) = db.set_channel_cooldown(&chan).await {
+                                                error!("Database error setting cooldown: {}", e);
+                                            }
+                                        } else {
+                                            client.part(message.channel_login.clone());
+                                        }
+                                    }
+                                    else if resp.status().is_client_error() {
                                         error!("Client error while deleting message: {:?} ({})", resp.status(), resp.text().await.unwrap());
                                     } else if resp.status().is_server_error() {
                                         warn!("Server error while deleting message: {:?} ({})", resp.status(), resp.text().await.unwrap());
