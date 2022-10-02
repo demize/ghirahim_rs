@@ -4,7 +4,7 @@ version = "2.0.0"
 edition = "2018"
 
 [dependencies]
-twitch-irc = { version = "4.0", features = ["transport-ws-rustls-webpki-roots", "metrics-collection"] }
+twitch-irc = { version = "4.1", features = ["transport-ws-rustls-webpki-roots", "metrics-collection", "refreshing-token-rustls-webpki-roots"] }
 tokio = { version = "1.20", features = ["rt", "rt-multi-thread", "macros"] }
 serde = "1.0"
 serde_yaml = "0.9"
@@ -26,4 +26,5 @@ metrics = "0.18"
 metrics-exporter-prometheus = { version = "0.9.0", features = ["http-listener"] }
 reqwest = { version = "0.11", features = ["json"] }
 tower = { version = "0.4", features = ["limit"] }
+async-trait = "0.1"
 workspace-hack = { path = "../workspace-hack" }
