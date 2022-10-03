@@ -7,7 +7,7 @@ edition = "2018"
 strum = { version = "0.24", features = ["derive"] }
 twitch-irc = { version = "4.1" }
 tldextract = "0.6.0"
-url = "2.2.2"
+url = "2"
 tokio = { version = "1.20.1", features = [
     "rt",
     "rt-multi-thread",

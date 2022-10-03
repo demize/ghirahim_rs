@@ -1,6 +1,6 @@
 [package]
 name    = "ghirahim_bot"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2018"
 
 [dependencies]
@@ -28,3 +28,17 @@ reqwest = { version = "0.11", features = ["json"] }
 tower = { version = "0.4", features = ["limit"] }
 async-trait = "0.1"
 workspace-hack = { path = "../workspace-hack" }
+
+# helper dependencies
+tiny_http = { version = "0.11", optional = true }
+text_io = { version = "0.1", optional = true }
+form_urlencoded = { version = "1.1.0", optional = true }
+colored = { version = "2", optional = true }
+url = { version = "2", optional = true }
+
+[features]
+helper = ["dep:tiny_http", "dep:text_io", "dep:form_urlencoded", "dep:colored", "dep:url", "reqwest/blocking"]
+
+[[bin]]
+name = "token_helper"
+required-features = ["helper"]
