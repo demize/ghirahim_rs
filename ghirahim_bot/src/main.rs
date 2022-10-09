@@ -947,6 +947,7 @@ pub async fn main() {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
         loop {
             interval.tick().await;
+            trace!("Checking token validity");
             let token = inner_creds
                 .get_credentials()
                 .await
@@ -966,6 +967,8 @@ pub async fn main() {
                     &resp.text().await.unwrap()
                 );
             }
+
+            trace!("Token is valid");
         }
     });
 
