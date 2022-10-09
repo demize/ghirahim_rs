@@ -941,6 +941,34 @@ pub async fn main() {
         }
     }
 
+    let inner_creds = creds.clone();
+    let inner_rest_client = rest_client.get_ref().clone();
+    let cred_check_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            let token = inner_creds
+                .get_credentials()
+                .await
+                .expect("Could not get token")
+                .token
+                .unwrap();
+            let resp = inner_rest_client
+                .get("https://id.twitch.tv/oauth2/validate")
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap();
+
+            if !resp.status().is_success() {
+                panic!(
+                    "Could not get validate token! {}",
+                    &resp.text().await.unwrap()
+                );
+            }
+        }
+    });
+
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
         info!("Started Ghirahim_Bot and connected to Twitch.");
@@ -1135,6 +1163,6 @@ pub async fn main() {
         }
     });
 
-    // Start the bot
-    join_handle.await.unwrap();
+    // Start the handles
+    tokio::try_join![join_handle, cred_check_handle].unwrap();
 }

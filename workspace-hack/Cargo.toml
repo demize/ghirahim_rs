@@ -20,7 +20,7 @@ futures-channel = { version = "0.3", features = ["alloc", "futures-sink", "sink"
 futures-util = { version = "0.3", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 rand = { version = "0.8", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
-reqwest = { version = "0.11", features = ["__rustls", "__tls", "default-tls", "hyper-rustls", "hyper-tls", "json", "native-tls-crate", "rustls", "rustls-pemfile", "rustls-tls-webpki-roots", "serde_json", "tokio-native-tls", "tokio-rustls", "webpki-roots"] }
+reqwest = { version = "0.11", features = ["__rustls", "__tls", "blocking", "default-tls", "hyper-rustls", "hyper-tls", "json", "native-tls-crate", "rustls", "rustls-pemfile", "rustls-tls-webpki-roots", "serde_json", "tokio-native-tls", "tokio-rustls", "webpki-roots"] }
 rustls = { version = "0.20", features = ["dangerous_configuration", "log", "logging", "tls12"] }
 serde_json = { version = "1", features = ["indexmap", "preserve_order", "std"] }
 tokio = { version = "1", features = ["bytes", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "rt", "rt-multi-thread", "socket2", "sync", "time", "tokio-macros"] }
