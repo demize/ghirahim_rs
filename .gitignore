@@ -12,6 +12,8 @@ target/
 # Secrets file
 ghirahim.yaml
 **/ghirahim.yaml
+secrets.json
+**/secrets.json
 
 # Sphinx/esbonio stuff
 .vscode/
@@ -19,3 +21,4 @@ Makefile
 conf.py
 index.rst
 make.bat
+_build/

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tldextract::{TldExtractor, TldOption};
 use tokio::sync::Semaphore;
-use twitch_irc::login::StaticLoginCredentials;
+use twitch_irc::login::{LoginCredentials, RefreshingLoginCredentials};
 use twitch_irc::message::{PrivmsgMessage, ServerMessage};
 use twitch_irc::ClientConfig;
 use twitch_irc::SecureWSTransport;
@@ -24,6 +24,9 @@ use tracing::{debug, error, info, instrument, subscriber::set_global_default, tr
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
+
+mod tokens;
+use tokens::JsonTokenStorage;
 
 const LEAVE_NOTICES: [&str; 6] = [
     "msg_banned",
@@ -323,7 +326,15 @@ async fn handle_command<
     let logon_name;
     {
         let r = BOT_CONFIG.read().unwrap();
-        logon_name = r.logon_name.clone();
+
+        if r.logon_name.is_none() {
+            warn!(
+                "Received message PRIVMSG before GLOBALUSERSTATE: {:#?}",
+                privmsg
+            );
+            return;
+        }
+        logon_name = r.logon_name.clone().unwrap();
     }
     if let Ok((args, command)) = parse_command(privmsg.message_text.as_str()).await.finish() {
         if privmsg.channel_login != logon_name {
@@ -747,18 +758,14 @@ async fn handle_command<
 
 #[derive(Debug, Clone)]
 struct BotConfig {
-    logon_name: String,
-    moderator_id: String,
-    client_id: String,
-    token: String,
+    logon_name: Option<String>,
+    moderator_id: Option<String>,
 }
 
 lazy_static! {
     static ref BOT_CONFIG: std::sync::RwLock<BotConfig> = std::sync::RwLock::new(BotConfig {
-        logon_name: "uninitialized".to_owned(),
-        moderator_id: "uninitialized".to_owned(),
-        client_id: "uninitialized".to_owned(),
-        token: "uninitialized".to_owned(),
+        logon_name: None,
+        moderator_id: None,
     });
 }
 
@@ -786,20 +793,6 @@ pub async fn main() {
         config = serde_yaml::from_str(&config_contents).expect("Unable to parse ghirahim.yaml");
     }
 
-    let logon_name: String;
-    let client_id: String;
-    let oauth_token: String;
-    // Initialize our login name and client ID, for use in other functions
-    {
-        let mut w = BOT_CONFIG.write().unwrap();
-        w.logon_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
-        w.client_id = config["ghirahim"]["client_id"].as_str().unwrap().to_owned();
-        w.token = config["ghirahim"]["password"].as_str().unwrap().to_owned();
-        logon_name = w.logon_name.clone();
-        client_id = w.client_id.clone();
-        oauth_token = w.token.clone();
-    }
-
     // set up the TLD list
     let temp_folder = tempfile::tempdir().expect("Couldn't create temporary folder");
     let option = TldOption::default()
@@ -809,14 +802,19 @@ pub async fn main() {
         .naive_mode(false);
     let ext = TldExtractor::new(option);
 
-    // Set up the IRC config based on the config file
-    let login_name = config["ghirahim"]["username"].as_str().unwrap().to_owned();
-    let irc_config = ClientConfig {
-        login_credentials: StaticLoginCredentials::new(login_name, Some(oauth_token.clone())),
-        metrics_identifier: Some(Cow::from("Ghirahim_Bot")), // Collect metrics; these will be exported with the prometheus exporter we set up above
-        connection_rate_limiter: Arc::new(Semaphore::new(2)), // Open two connections at once, if necessary
-        ..Default::default()
-    };
+    // Set up the IRC config
+    let client_id = config["ghirahim"]["client_id"].as_str().unwrap().to_owned();
+    let client_secret = config["ghirahim"]["client_secret"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let storage = JsonTokenStorage {};
+    let creds = RefreshingLoginCredentials::init(client_id.clone(), client_secret, storage);
+
+    // Pass all that into a config itself
+    let mut irc_config = ClientConfig::new_simple(creds.clone());
+    irc_config.connection_rate_limiter = Arc::new(Semaphore::new(2));
+    irc_config.metrics_identifier = Some(Cow::from("Ghirahim_Bot"));
 
     // Set up the rate limiter
     // This is set to 200 in 60 seconds, which *will* get us rate limited in the worst case (as long as we're not verified)
@@ -824,8 +822,10 @@ pub async fn main() {
     let limiter = Arc::new(RateLimiter::direct(Quota::per_minute(nonzero!(200u32))));
 
     // Set up the IRC client
-    let (mut incoming_messages, client) =
-        TwitchIRCClient::<SecureWSTransport, StaticLoginCredentials>::new(irc_config);
+    let (mut incoming_messages, client) = TwitchIRCClient::<
+        SecureWSTransport,
+        RefreshingLoginCredentials<JsonTokenStorage>,
+    >::new(irc_config);
 
     // Set up metrics if GHIRAHIM_METRICS is set
     if std::env::var("GHIRAHIM_METRICS").is_ok() {
@@ -858,9 +858,7 @@ pub async fn main() {
         .expect("Could not get database");
 
     // Get the list of all the channels we're supposed to be in
-    let mut channels = db.get_all_channels().await.unwrap();
-    // Insert the bot's own channel
-    channels.insert(logon_name.clone());
+    let channels = db.get_all_channels().await.unwrap();
     // Set the list of wanted channels to the channels from the DB plus the bot's own channel
     // If this fails, we want to panic; the bot doesn't work if it can't join any channels
     client.set_wanted_channels(channels).unwrap();
@@ -868,13 +866,17 @@ pub async fn main() {
     // Get our user ID from helix; also serves as a check to make sure the client ID is correct
     // Limit the scope here so we don't keep too many unnecessary variables around
     let rest_client;
-    let moderator_id: String;
     {
         let mut w = BOT_CONFIG.write().unwrap();
 
         // Set up headers
         let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(reqwest::header::USER_AGENT, format!("Ghirahim_Bot/{}", get_ghirahim_rs_version()).parse().unwrap());
+        headers.insert(
+            reqwest::header::USER_AGENT,
+            format!("Ghirahim_Bot/{}", get_ghirahim_rs_version())
+                .parse()
+                .unwrap(),
+        );
         headers.insert::<reqwest::header::HeaderName>(
             "Client-Id".parse().unwrap(),
             client_id.parse().unwrap(),
@@ -889,35 +891,104 @@ pub async fn main() {
             .rate_limit(600, Duration::from_secs(60))
             .service(temp_client);
 
+        // Get our ID and login by validating our token
+        let resp = rest_client
+            .get_ref()
+            .get("https://id.twitch.tv/oauth2/validate")
+            .bearer_auth(&creds.get_credentials().await.unwrap().token.unwrap())
+            .send()
+            .await
+            .unwrap();
+
+        if !resp.status().is_success() {
+            panic!(
+                "Could not get validate token! {}",
+                &resp.text().await.unwrap()
+            );
+        }
+
+        let json_resp: serde_json::Value =
+            serde_json::from_str(&resp.text().await.unwrap()).unwrap();
+
+        if !json_resp["scopes"].as_array().unwrap().iter().any(|s| {
+            s == "chat:edit" || s == "chat:moderate" || s == "moderator:manage:chat_messages"
+        }) {
+            panic!("Token is missing necessary scopes. Scopes are {} but should include [\"chat:edit\", \"chat:read\", \"moderator:manage:chat_messages\"]", json_resp["scopes"]);
+        }
+
+        if json_resp["client_id"] != client_id {
+            panic!("Token is issued for the wrong client ID");
+        }
+
+        w.moderator_id = Some(json_resp["user_id"].as_str().unwrap().to_string());
+        w.logon_name = Some(json_resp["login"].as_str().unwrap().to_string());
+
         // Set up the params
-        let params = vec![("login", logon_name.clone())];
+        let params = vec![("user_id", w.moderator_id.clone().unwrap())];
 
         // Get the response
         let resp = rest_client
             .get_ref()
             .get("https://api.twitch.tv/helix/users")
             .query(&params)
-            .bearer_auth(&oauth_token)
+            .bearer_auth(&creds.get_credentials().await.unwrap().token.unwrap())
             .send()
             .await
             .unwrap();
 
         if !resp.status().is_success() {
-            panic!("Could not get moderator ID! {}", &resp.text().await.unwrap());
+            panic!("Helix check failed! {}", &resp.text().await.unwrap());
         }
-
-        let json_resp: serde_json::Value =
-            serde_json::from_str(&resp.text().await.unwrap()).unwrap();
-
-        w.moderator_id = json_resp["data"][0]["id"].as_str().unwrap().to_string();
-        moderator_id = w.moderator_id.clone();
     }
+
+    let inner_creds = creds.clone();
+    let inner_rest_client = rest_client.get_ref().clone();
+    let cred_check_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            trace!("Checking token validity");
+            let token = inner_creds
+                .get_credentials()
+                .await
+                .expect("Could not get token")
+                .token
+                .unwrap();
+            let resp = inner_rest_client
+                .get("https://id.twitch.tv/oauth2/validate")
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap();
+
+            if !resp.status().is_success() {
+                panic!(
+                    "Could not get validate token! {}",
+                    &resp.text().await.unwrap()
+                );
+            }
+
+            trace!("Token is valid");
+        }
+    });
 
     // Set up the actual event loop
     let join_handle = tokio::spawn(async move {
         info!("Started Ghirahim_Bot and connected to Twitch.");
         while let Some(message) = incoming_messages.recv().await {
+            let logon_name: String;
+            let moderator_id: String;
+            {
+                let r = BOT_CONFIG.read().unwrap();
+                logon_name = r.logon_name.clone().unwrap();
+                moderator_id = r.moderator_id.clone().unwrap();
+            }
             match message {
+                ServerMessage::GlobalUserState(message) => {
+                    client
+                        .join(message.user_name.to_ascii_lowercase())
+                        .expect("Could not join own channel");
+                }
                 ServerMessage::Privmsg(message) => {
                     trace!("Received privmsg: {:?}", message);
                     let user_role = libghirahim::parse_badges(message.badges.clone());
@@ -995,26 +1066,52 @@ pub async fn main() {
                                         &message.channel_login,
                                         &message.message_id
                                     );
-                                    
+
                                     // Delete the message through Helix
-                                    let params = vec![("broadcaster_id", &message.channel_id),
-                                                                            ("moderator_id", &moderator_id),
-                                                                            ("message_id", &message.message_id)];
+                                    let params = vec![
+                                        ("broadcaster_id", &message.channel_id),
+                                        ("moderator_id", &moderator_id),
+                                        ("message_id", &message.message_id),
+                                    ];
                                     let resp = rest_client
                                         .get_ref()
                                         .delete("https://api.twitch.tv/helix/moderation/chat")
                                         .query(&params)
-                                        .bearer_auth(&oauth_token)
+                                        .bearer_auth(
+                                            &creds.get_credentials().await.unwrap().token.unwrap(),
+                                        )
                                         .send()
                                         .await
                                         .unwrap();
 
                                     debug!("Sent request: {:#?}", resp);
 
-                                    if resp.status().is_client_error() {
-                                        error!("Client error while deleting message: {:?} ({})", resp.status(), resp.text().await.unwrap());
+                                    if resp.status().as_u16() == 403 {
+                                        error!(
+                                            "Received 403 for {} while trying to delete message",
+                                            message.channel_login
+                                        );
+                                        if let Some(chan) =
+                                            db.get_channel(&message.channel_login).await
+                                        {
+                                            if let Err(e) = db.set_channel_cooldown(&chan).await {
+                                                error!("Database error setting cooldown: {}", e);
+                                            }
+                                        } else {
+                                            client.part(message.channel_login.clone());
+                                        }
+                                    } else if resp.status().is_client_error() {
+                                        error!(
+                                            "Client error while deleting message: {:?} ({})",
+                                            resp.status(),
+                                            resp.text().await.unwrap()
+                                        );
                                     } else if resp.status().is_server_error() {
-                                        warn!("Server error while deleting message: {:?} ({})", resp.status(), resp.text().await.unwrap());
+                                        warn!(
+                                            "Server error while deleting message: {:?} ({})",
+                                            resp.status(),
+                                            resp.text().await.unwrap()
+                                        );
                                     }
 
                                     let reply = generate_reply(&chan.reply, &message.sender.name);
@@ -1069,6 +1166,6 @@ pub async fn main() {
         }
     });
 
-    // Start the bot
-    join_handle.await.unwrap();
+    // Start the handles
+    tokio::try_join![join_handle, cred_check_handle].unwrap();
 }
