@@ -2,7 +2,7 @@ use governor::{Quota, RateLimiter};
 use lazy_static::lazy_static;
 use libghirahim::{GhirahimDB, UserRole};
 use nonzero_ext::*;
-use std::borrow::Cow;
+use prometheus::Encoder;
 use std::fs::File;
 use std::io::prelude::*;
 use std::str::FromStr;
@@ -19,6 +19,8 @@ use twitch_irc::TwitchIRCClient;
 use nom::{branch::alt, bytes::complete::tag_no_case, Finish};
 
 use serde_json;
+
+use prometheus::{register_counter_vec, Opts};
 
 use tracing::{debug, error, info, instrument, subscriber::set_global_default, trace, warn};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -247,19 +249,17 @@ async fn try_respond<
 ) {
     limiter.until_ready().await;
     if client
-        .say_in_response(
-            channel.to_owned(),
+        .say_in_reply_to(
+            &(channel.to_owned(), msg_id.to_owned()),
             msg_contents.to_owned(),
-            Some(msg_id.to_owned()),
         )
         .await
         .is_err()
     {
         if let Err(e) = client
-            .say_in_response(
-                channel.to_owned(),
+            .say_in_reply_to(
+                &(channel.to_owned(), msg_id.to_owned()),
                 msg_contents.to_owned(),
-                Some(msg_id.to_owned()),
             )
             .await
         {
@@ -769,6 +769,24 @@ lazy_static! {
     });
 }
 
+// HTTP server for Prometheus
+async fn serve_req(
+    _req: hyper::Request<hyper::Body>,
+) -> Result<hyper::Response<hyper::Body>, hyper::Error> {
+    let encoder = prometheus::TextEncoder::new();
+    let metric_families = prometheus::gather();
+    let mut buffer = vec![];
+    encoder.encode(&metric_families, &mut buffer).unwrap();
+
+    let response = hyper::Response::builder()
+        .status(200)
+        .header(hyper::header::CONTENT_TYPE, encoder.format_type())
+        .body(hyper::Body::from(buffer))
+        .unwrap();
+
+    Ok(response)
+}
+
 #[tokio::main]
 pub async fn main() {
     // Set up logging (based on https://www.lpalmieri.com/posts/2020-09-27-zero-to-production-4-are-we-observable-yet/)
@@ -811,10 +829,16 @@ pub async fn main() {
     let storage = JsonTokenStorage {};
     let creds = RefreshingLoginCredentials::init(client_id.clone(), client_secret, storage);
 
+    // Set up the metrics config
+    let metrics_config = twitch_irc::MetricsConfig::Enabled {
+        constant_labels: [].into(),
+        metrics_registry: None,
+    };
+
     // Pass all that into a config itself
     let mut irc_config = ClientConfig::new_simple(creds.clone());
     irc_config.connection_rate_limiter = Arc::new(Semaphore::new(2));
-    irc_config.metrics_identifier = Some(Cow::from("Ghirahim_Bot"));
+    irc_config.metrics_config = metrics_config; // Some(Cow::from("Ghirahim_Bot"));
 
     // Set up the rate limiter
     // This is set to 200 in 60 seconds, which *will* get us rate limited in the worst case (as long as we're not verified)
@@ -827,22 +851,28 @@ pub async fn main() {
         RefreshingLoginCredentials<JsonTokenStorage>,
     >::new(irc_config);
 
+    // Set up our Helix metric. This needs to be done regardless of whether it'll get used.
+    let helix_sent = register_counter_vec!(
+        Opts::new(
+            "ghirahim_helix_sent",
+            "Number of commands sent to the Helix API."
+        ),
+        &["command"]
+    )
+    .unwrap();
+
     // Set up metrics if GHIRAHIM_METRICS is set
     if std::env::var("GHIRAHIM_METRICS").is_ok() {
-        metrics_exporter_prometheus::PrometheusBuilder::new()
-            .with_http_listener(
-                config["metrics"]["bind_addr"]
-                    .as_str()
-                    .unwrap()
-                    .parse::<std::net::SocketAddr>()
-                    .unwrap(),
-            )
-            .install()
-            .expect("Failed to install metrics");
-        info!(
-            "Metrics set up and bound to {}",
-            config["metrics"]["bind_addr"].as_str().unwrap()
-        );
+        let bind_addr = config["metrics"]["bind_addr"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let serve_future =
+            hyper::Server::bind(&bind_addr).serve(hyper::service::make_service_fn(|_| async {
+                Ok::<_, hyper::Error>(hyper::service::service_fn(serve_req))
+            }));
+        tokio::spawn(serve_future);
     }
 
     // Set up the database connections
@@ -935,6 +965,11 @@ pub async fn main() {
             .send()
             .await
             .unwrap();
+
+        // Increase the Helix counter
+        if std::env::var("GHIRAHIM_METRICS").is_ok() {
+            helix_sent.with_label_values(&["users"]).inc();
+        }
 
         if !resp.status().is_success() {
             panic!("Helix check failed! {}", &resp.text().await.unwrap());
@@ -1083,6 +1118,11 @@ pub async fn main() {
                                         .send()
                                         .await
                                         .unwrap();
+
+                                    // Increase the Helix counter
+                                    if std::env::var("GHIRAHIM_METRICS").is_ok() {
+                                        helix_sent.with_label_values(&["delete"]).inc();
+                                    }
 
                                     debug!("Sent request: {:#?}", resp);
 

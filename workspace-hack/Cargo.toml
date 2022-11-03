@@ -13,21 +13,21 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-ahash = { version = "0.7", features = ["std"] }
 chrono = { version = "0.4", features = ["clock", "iana-time-zone", "js-sys", "oldtime", "serde", "std", "time", "wasm-bindgen", "wasmbind", "winapi"] }
 digest = { version = "0.10", features = ["alloc", "block-buffer", "core-api", "mac", "std", "subtle"] }
 futures-channel = { version = "0.3", features = ["alloc", "futures-sink", "sink", "std"] }
-futures-util = { version = "0.3", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
+futures-util = { version = "0.3", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "sink", "slab", "std"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
-rand = { version = "0.8", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
+prometheus = { version = "0.13", features = ["protobuf"] }
+rand = { version = "0.8", features = ["alloc", "getrandom", "libc", "rand_chacha", "small_rng", "std", "std_rng"] }
 reqwest = { version = "0.11", features = ["__rustls", "__tls", "blocking", "default-tls", "hyper-rustls", "hyper-tls", "json", "native-tls-crate", "rustls", "rustls-pemfile", "rustls-tls-webpki-roots", "serde_json", "tokio-native-tls", "tokio-rustls", "webpki-roots"] }
 rustls = { version = "0.20", features = ["dangerous_configuration", "log", "logging", "tls12"] }
 serde_json = { version = "1", features = ["indexmap", "preserve_order", "std"] }
-tokio = { version = "1", features = ["bytes", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "rt", "rt-multi-thread", "socket2", "sync", "time", "tokio-macros"] }
+tokio = { version = "1", features = ["bytes", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "rt", "rt-multi-thread", "socket2", "sync", "time", "tokio-macros"] }
 tokio-rustls = { version = "0.23", features = ["dangerous_configuration", "logging", "tls12"] }
 tokio-util = { version = "0.7", features = ["codec", "io", "tracing"] }
 tracing = { version = "0.1", features = ["attributes", "log", "std", "tracing-attributes"] }
-tracing-core = { version = "0.1", features = ["lazy_static", "std"] }
-twitch-irc = { version = "4", features = ["__refreshing-token", "async-tungstenite", "bytes", "metrics", "metrics-collection", "refreshing-token-rustls-webpki-roots", "reqwest", "serde", "tokio-native-tls", "tokio-stream", "tokio-util", "transport-tcp", "transport-tcp-native-tls", "transport-ws", "transport-ws-rustls-webpki-roots", "with-serde"] }
+tracing-core = { version = "0.1", features = ["once_cell", "std"] }
+twitch-irc = { version = "5", features = ["__refreshing-token", "async-tungstenite", "bytes", "metrics-collection", "prometheus", "refreshing-token-rustls-webpki-roots", "reqwest", "serde", "tokio-native-tls", "tokio-stream", "tokio-util", "transport-tcp", "transport-tcp-native-tls", "transport-ws", "transport-ws-rustls-webpki-roots", "with-serde"] }
 
 ### END HAKARI SECTION

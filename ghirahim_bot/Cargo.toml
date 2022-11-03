@@ -1,36 +1,36 @@
 [package]
 name    = "ghirahim_bot"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2018"
 
 [dependencies]
-twitch-irc = { version = "4.1", features = ["transport-ws-rustls-webpki-roots", "metrics-collection", "refreshing-token-rustls-webpki-roots"] }
+twitch-irc = { version = "5.0", features = ["transport-ws-rustls-webpki-roots", "metrics-collection", "refreshing-token-rustls-webpki-roots"] }
 tokio = { version = "1.20", features = ["rt", "rt-multi-thread", "macros", "time"] }
 serde = "1.0"
 serde_yaml = "0.9"
 serde_json = "1.0"
-tldextract = "0.6.0"
+tldextract = "0.6"
 tempfile = "3.2"
 tracing = "0.1"
 tracing-futures = "0.2"
-tracing-subscriber = { version = "=0.3.11", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
 libghirahim = { path = "../libghirahim" }
 nom = "7.0"
-governor = "0.4"
+governor = "0.5"
 nonzero_ext = "0.3"
 pkg-version = "1.0"
 lazy_static = "1.4"
-metrics = "0.18"
-metrics-exporter-prometheus = { version = "0.9.0", features = ["http-listener"] }
+prometheus = "0.13"
 reqwest = { version = "0.11", features = ["json", "rustls"] }
 tower = { version = "0.4", features = ["limit"] }
 async-trait = "0.1"
 workspace-hack = { path = "../workspace-hack" }
+hyper = { version = "0.14", features = ["http1", "server"] }
 
 # helper dependencies
-tiny_http = { version = "0.11", optional = true }
+tiny_http = { version = "0.12", optional = true }
 text_io = { version = "0.1", optional = true }
 form_urlencoded = { version = "1.1.0", optional = true }
 colored = { version = "2", optional = true }
