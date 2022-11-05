@@ -921,20 +921,31 @@ pub async fn main() {
             .rate_limit(600, Duration::from_secs(60))
             .service(temp_client);
 
-        // Get our ID and login by validating our token
-        let resp = rest_client
-            .get_ref()
-            .get("https://id.twitch.tv/oauth2/validate")
-            .bearer_auth(&creds.get_credentials().await.unwrap().token.unwrap())
-            .send()
-            .await
-            .unwrap();
-
-        if !resp.status().is_success() {
-            panic!(
-                "Could not get validate token! {}",
-                &resp.text().await.unwrap()
-            );
+        let mut resp_count = 0;
+        let mut resp;
+        loop {
+            // Get our ID and login by validating our token
+            resp = rest_client
+                .get_ref()
+                .get("https://id.twitch.tv/oauth2/validate")
+                .bearer_auth(&creds.get_credentials().await.unwrap().token.unwrap())
+                .send()
+                .await
+                .unwrap();
+                
+            if resp.status().is_success() {
+                break;
+            } else if resp.status().is_client_error() {
+                panic!("Could not validate token! {}", &resp.text().await.unwrap())
+            } else if resp.status().is_server_error() {
+                warn!("Received a server error while validating token on initial startup: {}", &resp.text().await.unwrap());
+                resp_count += 1;
+                if resp_count >= 5 {
+                    panic!("Received too many server errors. Panicing.");
+                }
+            } else {
+                panic!("Received an unexpected response from the Twitch API: {}", &resp.text().await.unwrap())
+            }
         }
 
         let json_resp: serde_json::Value =
@@ -997,10 +1008,17 @@ pub async fn main() {
                 .unwrap();
 
             if !resp.status().is_success() {
-                panic!(
-                    "Could not get validate token! {}",
-                    &resp.text().await.unwrap()
-                );
+                if resp.status().is_server_error() {
+                    warn!(
+                        "Received a server error while validating token: {}",
+                        &resp.text().await.unwrap()
+                    );
+                } else {
+                    panic!(
+                        "Could not validate token! {}",
+                        &resp.text().await.unwrap()
+                    );
+                }
             }
 
             trace!("Token is valid");

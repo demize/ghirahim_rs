@@ -584,7 +584,7 @@ dependencies = [
 
 [[package]]
 name = "ghirahim_bot"
-version = "2.2.0"
+version = "2.2.1"
 dependencies = [
  "async-trait",
  "colored",
