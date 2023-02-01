@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 twitch-irc = { version = "5.0", features = ["transport-ws-rustls-webpki-roots", "metrics-collection", "refreshing-token-rustls-webpki-roots"] }
-tokio = { version = "1.20", features = ["rt", "rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.25", features = ["rt", "rt-multi-thread", "macros", "time"] }
 serde = "1.0"
 serde_yaml = "0.9"
 serde_json = "1.0"
