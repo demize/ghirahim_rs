@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "ghirahim_bot"
-version = "2.2.1"
+version = "2.2.2"
 dependencies = [
  "async-trait",
  "colored",
@@ -968,7 +968,7 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 
 [[package]]
 name = "libghirahim"
-version = "1.1.5"
+version = "1.1.6"
 dependencies = [
  "futures",
  "mongodb",
@@ -1717,9 +1717,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.101.1"
+version = "0.101.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f36a6828982f422756984e47912a7a51dcbc2a197aa791158f8ca61cd8204e"
+checksum = "7d93931baf2d282fff8d3a532bbfd7653f734643161b87e3e01e59a04439bf0d"
 dependencies = [
  "ring",
  "untrusted",
