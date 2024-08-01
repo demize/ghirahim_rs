@@ -27,7 +27,7 @@ reqwest = { version = "0.11", features = ["json", "rustls"] }
 tower = { version = "0.4", features = ["limit"] }
 async-trait = "0.1"
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
-hyper = { version = "0.14", features = ["http1", "server"] }
+hyper = { version = "1.4", features = ["http1", "server"] }
 
 # helper dependencies
 tiny_http = { version = "0.12", optional = true }
